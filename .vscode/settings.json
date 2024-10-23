@@ -9,6 +9,7 @@
         "limits": "c",
         "numeric": "c",
         "create.h": "c",
-        "ostream": "cpp"
+        "ostream": "cpp",
+        "iostream": "cpp"
     }
 }

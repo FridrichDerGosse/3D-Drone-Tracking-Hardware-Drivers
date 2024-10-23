@@ -8,7 +8,7 @@ LCORES =-j8
 RCORES =-j4
 
 # project structure
-SRC_DIR = src
+SRC_DIR = src	
 INCLUDE_DIR = include
 DEV_INCLUDE = devinclude
 OBJ_DIR = obj

@@ -34,15 +34,16 @@ namespace stepper {
             stepper_pinout_t pins;
 
             void update_pins() const;
+            bool can_move() const; // later used for end-switches
 
         public:
             explicit Base(stepper_pinout_t pins);
 
-            [[nodiscard]] int16_t get_current_step() const;
+            int16_t get_current_step() const;
 
             void set_speed(uint8_t speed);
 
-            void move_steps(signed short int n);
+            int8_t move_steps(signed short int n);
             void off() const;
     };
 
@@ -52,6 +53,7 @@ namespace stepper {
             uint16_t n_steps = 0;  // set by calibration, n steps between end switches
             int16_t max_step_left = 0;
             int16_t max_step_right = 0;
+            bool is_calibrating = false;
 
         protected:
             const uint8_t angle_size = 120;
@@ -60,7 +62,8 @@ namespace stepper {
             pin_t end_right_pin;
 
             // internal functions
-            [[nodiscard]] bool check_calibrated() const;
+            bool check_calibrated() const;
+            bool can_move() const; // later used for end-switches
 
         public:
             Horizontal(
@@ -75,9 +78,9 @@ namespace stepper {
              */
             [[nodiscard]] double get_current_angle() const;
 
-            uint8_t move_steps(int16_t n);
+            int8_t move_steps(int16_t n);
             void move_relative_angle(double angle_delta);
             void move_absolute_angle(double angle);
-            uint8_t calibrate();
+            int8_t calibrate();
     };
 };

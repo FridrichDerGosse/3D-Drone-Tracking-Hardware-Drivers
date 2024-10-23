@@ -33,6 +33,11 @@ void Base::update_pins() const
     gpiod_line_set_value(pins.pin_d, sequence[current_step % sequence_size] & 0b1000);
 }
 
+bool Base::can_move() const
+{
+    return true;
+}
+
 Base::Base(const stepper_pinout_t pins)
     : pins(pins)
 {
@@ -50,7 +55,13 @@ void Base::set_speed(uint8_t speed)
     step_delay_us = map(std::min((int)speed, 250), 0, 255, 10000, 400);
 }
 
-void Base::move_steps(const signed short int n) {
+int8_t Base::move_steps(const signed short int n) {
+    if (!can_move())
+    {
+        std::cout << "can't move" << std::endl;
+        return 4;
+    }
+
     // step in one direction
     for (signed short int i = 0; i < n; i++) {
         current_step++;
@@ -70,6 +81,8 @@ void Base::move_steps(const signed short int n) {
         // stepper speed
         usleep(step_delay_us);
     };
+
+    return 0;
 };
 
 void Base::off() const
@@ -86,6 +99,14 @@ bool Horizontal::check_calibrated() const
 {
     return n_steps != 0;
 };
+
+bool Horizontal::can_move() const
+{
+    if (is_calibrating)
+        return true;
+
+    return !gpiod_line_get_value(end_left_pin) and !gpiod_line_get_value(end_right_pin);
+}
 
 Horizontal::Horizontal(
     const stepper_pinout_t pins,
@@ -106,56 +127,74 @@ double Horizontal::get_current_angle() const
     );
 };
 
-uint8_t Horizontal::calibrate() {
+int8_t Horizontal::calibrate() {
     // set n_steps to be able to move the motor
+    is_calibrating = true;
     n_steps = Base::steps_per_rev;
     max_step_left = Base::steps_per_rev;
     max_step_right = -Base::steps_per_rev;
 
     // move left until hitting the end switch
     while (!gpiod_line_get_value(end_left_pin))
+    {
         if (move_steps(1) > 0)
-            std::cout << "error aligning: stepper can't find end switch" << std::endl;
+        {
+            std::cerr << "error aligning: stepper can't find end switch" << std::endl;
+            return 1;
+        }
+        
+        if (gpiod_line_get_value(end_right_pin))
+        {
+            std::cerr << "error aligning: wrong end switch touched - check wiring" << std::endl;
+        }
+    }
+
 
     max_step_left = get_current_step();
 
     // move right until hitting the end switch
     while (!gpiod_line_get_value(end_right_pin))
+    {
         if (move_steps(-1) > 0)
-            std::cout << "error aligning: stepper can't find end switch" << std::endl;
+        {
+            std::cerr << "error aligning: stepper can't find end switch" << std::endl;
+            return 1;
+        }
+    }
 
     max_step_right = get_current_step();
 
     // calculate fancy stuff
     n_steps = max_step_left - max_step_right;
+    is_calibrating = false;
 
     // move to center
     move_absolute_angle(0);
+    return 0;
 }
 
-uint8_t Horizontal::move_steps(int16_t n) {
+int8_t Horizontal::move_steps(int16_t n) {
     if (!check_calibrated())
     {
-        std::cout << "can't move, not calibrated yet!" << std::endl;
+        std::cerr << "can't move, not calibrated yet!" << std::endl;
         return 1;
     }
 
     if (get_current_step() + n > max_step_left)
     {
-        std::cout << "steps out of moveable range, moving to max left" << std::endl;
+        std::cerr << "steps out of moveable range, moving to max left" << std::endl;
         n = max_step_left - get_current_step();
         return 2;
     }
 
     if (get_current_step() + n < max_step_right)
     {
-        std::cout << "steps out of moveable range, moving to max right" << std::endl;
+        std::cerr << "steps out of moveable range, moving to max right" << std::endl;
         n = max_step_right - get_current_step();
         return 3;
     }
 
-    Base::move_steps(n);
-    return 0;
+    return Base::move_steps(n);
 };
 
 void Horizontal::move_relative_angle(const double angle_delta)

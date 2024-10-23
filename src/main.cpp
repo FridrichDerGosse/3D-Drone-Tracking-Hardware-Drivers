@@ -66,7 +66,7 @@ int main()
     // simple_stepper.off();
 
     // cleanup
-
+    stepper.off();
     usleep(100000);
 
     gpiod_line_release(in1);
