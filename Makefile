@@ -3,7 +3,7 @@
 CARG = 
 LARG = 
 USER = armsom
-HOST = armsom-sige7.local
+HOST = 192.168.68.88
 LCORES =-j8
 RCORES =-j4
 

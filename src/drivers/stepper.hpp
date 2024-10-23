@@ -39,11 +39,32 @@ namespace stepper {
         public:
             explicit Base(stepper_pinout_t pins);
 
+            /**
+             * @brief getter for current_Step
+             * 
+             * @return int16_t current step delta from start
+             */
             int16_t get_current_step() const;
 
+            /**
+             * @brief set how fast the stepper should move
+             * 
+             * @param speed 0 to 250
+             */
             void set_speed(uint8_t speed);
 
+            /**
+             * @brief move the stepper motor
+             * 
+             * @param n how many steps to move
+             * @return 0: OK, 4: can't move
+             */
             int8_t move_steps(signed short int n);
+
+            /**
+             * @brief turn all stepper pins off (relese motor)
+             * 
+             */
             void off() const;
     };
 
@@ -72,15 +93,37 @@ namespace stepper {
                 pin_t end_right
             );
 
-            /**
-             *
-             * @return current angle of the stepper
-             */
-            [[nodiscard]] double get_current_angle() const;
-
-            int8_t move_steps(int16_t n);
-            void move_relative_angle(double angle_delta);
-            void move_absolute_angle(double angle);
             int8_t calibrate();
+
+            /**
+             * @brief get the current angle in degrees
+             * 
+             * @return double
+             */
+            double get_current_angle() const;
+
+            /**
+             * @brief move the stepper motor
+             * 
+             * @param n how many steps to move
+             * @return 0: OK, 1: not calibrated, 2: max left, 3: max right
+             */
+            int8_t move_steps(int16_t n);
+
+            /**
+             * @brief move by a specified amount of degrees
+             * 
+             * @param angle_delta move by
+             */
+            void move_relative_angle(double angle_delta);
+
+            /**
+             * @brief move to an absolute position
+             * 
+             * @param angle move to
+             */
+            void move_absolute_angle(double angle);
     };
+
+    
 };

@@ -4,6 +4,7 @@
 
 gpiod_line* get_pin(gpiod_chip* chip, unsigned int pin, bool is_input, bool default_value)
 {
+    // get line from chip
     gpiod_line* line = gpiod_chip_get_line(chip, pin);
     if (!line)
     {
@@ -11,6 +12,7 @@ gpiod_line* get_pin(gpiod_chip* chip, unsigned int pin, bool is_input, bool defa
         return nullptr;
     }
 
+    // define line a input / output
     if (is_input)
     {
         if (gpiod_line_request_input(line, "Fridrich Turret") < 0)
@@ -27,8 +29,6 @@ gpiod_line* get_pin(gpiod_chip* chip, unsigned int pin, bool is_input, bool defa
             return nullptr;
         }
     }
-
-    std::cout << "set " << pin << " to " << (is_input ? "input" : "output") << std::endl;
 
     return line;
 }

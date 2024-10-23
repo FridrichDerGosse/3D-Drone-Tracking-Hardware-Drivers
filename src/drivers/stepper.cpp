@@ -1,13 +1,12 @@
 #include "stepper.hpp"
 
 #include <iostream>
-#include <ostream>
 #include <unistd.h>
-#include <bitset>
 #include <algorithm>
 
 using namespace stepper;
 
+// uln2003 step pattern
 const int stepper::sequence[8] = {
     0b1001,
     0b1000,
@@ -23,9 +22,6 @@ const int stepper::sequence[8] = {
 // Basic stepper
 void Base::update_pins() const
 {
-    std::bitset<4> tmp(sequence[current_step % sequence_size]);
-    // std::cout << "updating pins: " << tmp << std::endl;
-
     // update all pins corresponding to the current sequence position
     gpiod_line_set_value(pins.pin_a, sequence[current_step % sequence_size] & 0b0001);
     gpiod_line_set_value(pins.pin_b, sequence[current_step % sequence_size] & 0b0010);
@@ -52,10 +48,12 @@ int16_t Base::get_current_step() const
 
 void Base::set_speed(uint8_t speed)
 {
+    // map speed to delay (max 250 because idk why but it won't work if i don't do this)
     step_delay_us = map(std::min((int)speed, 250), 0, 255, 10000, 400);
 }
 
 int8_t Base::move_steps(const signed short int n) {
+    // check if movement is allowed
     if (!can_move())
     {
         std::cout << "can't move" << std::endl;
@@ -65,7 +63,6 @@ int8_t Base::move_steps(const signed short int n) {
     // step in one direction
     for (signed short int i = 0; i < n; i++) {
         current_step++;
-
         update_pins();
 
         // stepper speed
@@ -75,7 +72,6 @@ int8_t Base::move_steps(const signed short int n) {
     // step in the other direction
     for (signed short int i = 0; i > n; i--) {
         current_step--;
-
         update_pins();
 
         // stepper speed
@@ -102,6 +98,7 @@ bool Horizontal::check_calibrated() const
 
 bool Horizontal::can_move() const
 {
+    // "override" end-switches for calibration
     if (is_calibrating)
         return true;
 
@@ -118,6 +115,7 @@ Horizontal::Horizontal(
 
 double Horizontal::get_current_angle() const
 {
+    // convert step position to angular position
     return map(
         get_current_step(),
         max_step_right,
@@ -128,9 +126,10 @@ double Horizontal::get_current_angle() const
 };
 
 int8_t Horizontal::calibrate() {
-    // set n_steps to be able to move the motor
+    // set to calibration mode so the stepper is allowed to move
     is_calibrating = true;
-    n_steps = Base::steps_per_rev;
+
+    // set a maximum of one rotation to find the end-switch
     max_step_left = Base::steps_per_rev;
     max_step_right = -Base::steps_per_rev;
 
@@ -174,7 +173,7 @@ int8_t Horizontal::calibrate() {
 }
 
 int8_t Horizontal::move_steps(int16_t n) {
-    if (!check_calibrated())
+    if (!check_calibrated() && !is_calibrating)
     {
         std::cerr << "can't move, not calibrated yet!" << std::endl;
         return 1;
