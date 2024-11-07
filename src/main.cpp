@@ -17,10 +17,11 @@ int main()
         return -1;
     }
 
-    gpiod_line* in1 = get_pin(chip_3, B+3, false, false);
-    gpiod_line* in2 = get_pin(chip_3, B+2, false, false);
-    gpiod_line* in3 = get_pin(chip_3, B+1, false, false);
-    gpiod_line* in4 = get_pin(chip_3, B+6, false, false);
+    // input order: 1, 4, 3, 2 (cheap chinese steppers ...)
+    gpiod_line* a = get_pin(chip_3, B+3, false, false);  // in 1
+    gpiod_line* b = get_pin(chip_3, B+6, false, false);  // in 4
+    gpiod_line* c = get_pin(chip_3, B+1, false, false);  // in 3
+    gpiod_line* d = get_pin(chip_3, B+2, false, false);  // in 2
 
     gpiod_line* esl = get_pin(chip_3, A+7, true);
     gpiod_line* esr = get_pin(chip_3, C+2, true);
@@ -31,9 +32,9 @@ int main()
     //     usleep(100000);
     // }
 
-    stepper::Base simple_stepper({in1, in2, in3, in4});
-    stepper::Horizontal stepper({in1, in2, in3, in4}, esl, esr);
-    stepper.set_speed(200);
+    stepper::Base simple_stepper({a, b, c, d});
+    stepper::Horizontal stepper({a, b, c, d}, esr, esl);
+    stepper.set_speed(100);
 
     stepper.calibrate();
 
@@ -64,15 +65,32 @@ int main()
     // simple_stepper.move_steps(-4200);
 
     // simple_stepper.off();
+    std::cout << "at 0°. steps: " << stepper.get_current_step() << std::endl;
+    usleep(5000000);
+
+    std::cout << "30°" << std::endl;
+    stepper.move_absolute_angle(30);
+    usleep(5000000);
+
+
+    std::cout << "100" << std::endl;
+    stepper.move_steps(100);
+
+    usleep(5000000);
+
+
+    std::cout << "-60°" << std::endl;
+    stepper.move_relative_angle(-60);
+    usleep(5000000);
 
     // cleanup
     stepper.off();
     usleep(100000);
 
-    gpiod_line_release(in1);
-    gpiod_line_release(in2);
-    gpiod_line_release(in3);
-    gpiod_line_release(in4);
+    gpiod_line_release(a);
+    gpiod_line_release(b);
+    gpiod_line_release(c);
+    gpiod_line_release(d);
     gpiod_chip_close(chip_3);
 
     return 0;

@@ -32,3 +32,14 @@ gpiod_line* get_pin(gpiod_chip* chip, unsigned int pin, bool is_input, bool defa
 
     return line;
 }
+
+// implementation for gpiod
+int pin_write(pin_t pin, bool value)
+{
+    return gpiod_line_set_value(pin, value);
+}
+
+bool pin_read(pin_t pin)
+{
+    return gpiod_line_get_value(pin);
+}

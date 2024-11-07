@@ -30,3 +30,17 @@ gpiod_line* get_pin(
     bool is_input,
     bool default_value = false
 );
+
+/**
+ * @brief set a pins satate
+ * 
+ * @returns 0 if success
+ *
+ */
+int pin_write(pin_t pin, bool value);
+
+/**
+ * @brief read a pins state
+ * 
+ */
+bool pin_read(pin_t pin);
