@@ -1,97 +1,126 @@
 #include <iostream>
 #include <gpiod.h>
 #include <unistd.h>
+#include <thread>
 
 #include "drivers/stepper.hpp"
+#include "pinout.hpp"
 
 
 #define CHIP_NAME "gpiochip3"
-#define LINE_NUMBER B+3
+
+// stepper gearing: 16:105 (1 turret rotation = 6.5625 stepper rotations = 26 880 steps)
 
 int main()
 {
-    gpiod_chip* chip_3 = gpiod_chip_open_by_name(CHIP_NAME);
-    if (!chip_3)
-    {
-        std::cerr << "Failed to open chip" << std::endl;
-        return -1;
-    }
+    // setup chips and pins
+    auto stepper0_chip = get_chip(STEPPER0_CHIP);
+    auto stepper1_chip = get_chip(STEPPER1_CHIP);
+    auto stepper2_chip = get_chip(STEPPER2_CHIP);
 
     // input order: 1, 4, 3, 2 (cheap chinese steppers ...)
-    gpiod_line* a = get_pin(chip_3, B+3, false, false);  // in 1
-    gpiod_line* b = get_pin(chip_3, B+6, false, false);  // in 4
-    gpiod_line* c = get_pin(chip_3, B+1, false, false);  // in 3
-    gpiod_line* d = get_pin(chip_3, B+2, false, false);  // in 2
+    auto stepper0_a = get_pin(stepper0_chip, STEPPER0_IN1, false, false);  // in 1
+    auto stepper0_b = get_pin(stepper0_chip, STEPPER0_IN4, false, false);  // in 4
+    auto stepper0_c = get_pin(stepper0_chip, STEPPER0_IN3, false, false);  // in 3
+    auto stepper0_d = get_pin(stepper0_chip, STEPPER0_IN2, false, false);  // in 2
 
-    gpiod_line* esl = get_pin(chip_3, A+7, true);
-    gpiod_line* esr = get_pin(chip_3, C+2, true);
+    auto stepper1_a = get_pin(stepper1_chip, STEPPER1_IN1, false, false);  // in 1
+    auto stepper1_b = get_pin(stepper1_chip, STEPPER1_IN4, false, false);  // in 4
+    auto stepper1_c = get_pin(stepper1_chip, STEPPER1_IN3, false, false);  // in 3
+    auto stepper1_d = get_pin(stepper1_chip, STEPPER1_IN2, false, false);  // in 2
 
-    // for (;;)
-    // {
-    //     std::cout << "Left: " << gpiod_line_get_value(esl) << ", Right: " << gpiod_line_get_value(esr) << std::endl;
-    //     usleep(100000);
-    // }
+    auto stepper2_a = get_pin(stepper2_chip, STEPPER2_IN1, false, false);  // in 1
+    auto stepper2_b = get_pin(stepper2_chip, STEPPER2_IN4, false, false);  // in 4
+    auto stepper2_c = get_pin(stepper2_chip, STEPPER2_IN3, false, false);  // in 3
+    auto stepper2_d = get_pin(stepper2_chip, STEPPER2_IN2, false, false);  // in 2
 
-    stepper::Base simple_stepper({a, b, c, d});
-    stepper::Horizontal stepper({a, b, c, d}, esr, esl);
-    stepper.set_speed(100);
+    auto esl = get_pin(stepper0_chip, END_SWITCH_LEFT, true);
+    auto esr = get_pin(stepper0_chip, END_SWITCH_RIGHT, true);
 
-    stepper.calibrate();
+    auto esu = get_pin(stepper0_chip, END_SWITCH_UP, true);
+    auto esd = get_pin(stepper0_chip, END_SWITCH_DOWN, true);
 
-    // std::cout << "moving direction 1" << std::endl;
-    // std::cout << "speed 50" << std::endl;
-    // simple_stepper.set_speed(50);
-    // simple_stepper.move_steps(500);
+    // initialize stepper drivers
+    stepper::Horizontal horizontal_stepper(
+        {stepper0_a, stepper0_b, stepper0_c, stepper0_d},
+        esr,
+        esl
+    );
+    stepper::Vertical vertical_stepper(
+        {stepper1_a, stepper1_b, stepper1_c, stepper1_d},
+        {stepper2_a, stepper2_b, stepper2_c, stepper2_d},
+        esu,
+        esd
+    );
 
-    // std::cout << "speed 100" << std::endl;
-    // simple_stepper.set_speed(100);
-    // simple_stepper.move_steps(700);
+    // calibrate steppers
+    std::thread thread_obj(&stepper::Vertical::calibrate, &vertical_stepper);
+    thread_obj.detach();
 
-    // std::cout << "speed 150" << std::endl;
-    // simple_stepper.set_speed(150);
-    // simple_stepper.move_steps(1000);
+    horizontal_stepper.calibrate();
 
-    // std::cout << "speed 200" << std::endl;
-    // simple_stepper.set_speed(200);
-    // simple_stepper.move_steps(1000);
+    // make sure all steppers are aligend
+    if (thread_obj.joinable())
+        thread_obj.join();
 
-    // std::cout << "speed 250" << std::endl;
-    // simple_stepper.set_speed(250);
-    // simple_stepper.move_steps(1000);
+    // set speeds
+    horizontal_stepper.set_speed(200);
+    vertical_stepper.set_speed(100);
 
-    // usleep(1000000);
+    // set steppers to 0
+    std::thread thread_obj(&stepper::Vertical::move_absolute_angle, &vertical_stepper, 0);
+    thread_obj.detach();
 
-    // std::cout << "moving direction 2" << std::endl;
-    // simple_stepper.move_steps(-4200);
+    horizontal_stepper.move_absolute_angle(0);
 
-    // simple_stepper.off();
-    std::cout << "at 0°. steps: " << stepper.get_current_step() << std::endl;
+    // make sure all steppers have moved
+    if (thread_obj.joinable())
+        thread_obj.join();
+
+    // basic manouvers
+    std::cout << "at 0°. steps: " << horizontal_stepper.get_current_step() << std::endl;
     usleep(5000000);
 
     std::cout << "30°" << std::endl;
-    stepper.move_absolute_angle(30);
+    horizontal_stepper.move_absolute_angle(30);
     usleep(5000000);
 
 
     std::cout << "100" << std::endl;
-    stepper.move_steps(100);
+    horizontal_stepper.move_steps(100);
 
     usleep(5000000);
 
 
     std::cout << "-60°" << std::endl;
-    stepper.move_relative_angle(-60);
+    horizontal_stepper.move_relative_angle(-60);
     usleep(5000000);
 
+    horizontal_stepper.move_absolute_angle(0);
+
     // cleanup
-    stepper.off();
+    horizontal_stepper.off();
     usleep(100000);
 
-    gpiod_line_release(a);
-    gpiod_line_release(b);
-    gpiod_line_release(c);
-    gpiod_line_release(d);
-    gpiod_chip_close(chip_3);
+    // release lines and chips
+    gpiod_line_release(stepper0_a);
+    gpiod_line_release(stepper0_b);
+    gpiod_line_release(stepper0_c);
+    gpiod_line_release(stepper0_d);
+
+    gpiod_line_release(stepper1_a);
+    gpiod_line_release(stepper1_b);
+    gpiod_line_release(stepper1_c);
+    gpiod_line_release(stepper1_d);
+
+    gpiod_line_release(stepper2_a);
+    gpiod_line_release(stepper2_b);
+    gpiod_line_release(stepper2_c);
+    gpiod_line_release(stepper2_d);
+
+    gpiod_chip_close(stepper0_chip);
+    gpiod_chip_close(stepper1_chip);
+    gpiod_chip_close(stepper2_chip);
 
     return 0;
 }

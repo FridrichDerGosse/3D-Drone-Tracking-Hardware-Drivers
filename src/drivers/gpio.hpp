@@ -15,7 +15,19 @@
 #define C 16
 #define D 4
 
+// typedef struct {
+//     gpiod_chip* chip_name;
+//     gpiod_line* pin_number;
+// } pin_t;
+
 typedef gpiod_line* pin_t;
+
+/**
+ * @brief get a gpio chip
+ * 
+ * @param chip_name normally "gpiochipX"
+ */
+gpiod_chip* get_chip(const char* chip_name);
 
 /**
  * @brief create a gpio line and set it to input / output

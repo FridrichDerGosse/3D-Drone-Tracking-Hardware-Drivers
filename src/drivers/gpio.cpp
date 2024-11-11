@@ -2,6 +2,18 @@
 #include "gpio.hpp"
 
 
+gpiod_chip* get_chip(const char* chip_name)
+{
+    gpiod_chip* stepper0_chip = gpiod_chip_open_by_name(chip_name);
+    if (!stepper0_chip)
+    {
+        std::cerr << "Failed to open chip " << chip_name << std::endl;
+        return nullptr;
+    }
+
+    return stepper0_chip;
+}
+
 gpiod_line* get_pin(gpiod_chip* chip, unsigned int pin, bool is_input, bool default_value)
 {
     // get line from chip

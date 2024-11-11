@@ -29,7 +29,7 @@ namespace stepper {
 
         protected:
             const uint8_t sequence_size = 8;
-            const uint16_t steps_per_rev = 4096;  // I think, not sure tho
+            const uint16_t steps_per_rev = 26880;  // (4096 * gearing) I think, not sure tho
             uint16_t step_delay_us = 1000;
             stepper_pinout_t pins;
 
@@ -83,7 +83,6 @@ namespace stepper {
             pin_t end_right_pin;
 
             // internal functions
-            bool check_calibrated() const;
             bool can_move() const; // later used for end-switches
 
         public:
@@ -94,6 +93,7 @@ namespace stepper {
             );
 
             int8_t calibrate();
+            bool check_calibrated() const;
 
             /**
              * @brief get the current angle in degrees
@@ -136,7 +136,7 @@ namespace stepper {
         
         protected:
             const uint8_t sequence_size = 8;
-            const uint16_t steps_per_rev = 4096;  // I think, not sure tho
+            const uint16_t steps_per_rev = 26880;  // I think, not sure tho
             uint16_t step_delay_us = 1000;
 
             const uint8_t max_down_angle = -10;
@@ -152,8 +152,6 @@ namespace stepper {
             // internal functions
             void update_pins() const;
             bool can_move() const; // later used for end-switches
-            bool check_calibrated() const;
-            bool can_move() const; // later used for end-switches
         
         public:
             Vertical(
@@ -164,6 +162,7 @@ namespace stepper {
             );
 
             int8_t calibrate();
+            bool check_calibrated() const;
 
             /**
              * @brief set how fast the stepper should move

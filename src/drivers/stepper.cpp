@@ -149,7 +149,7 @@ int8_t Horizontal::calibrate() {
     uint16_t old_delay = step_delay_us;
 
     // set speed
-    set_speed(50);
+    set_speed(200);
 
     // move left until hitting the end switch
     while (!pin_read(end_left_pin))
@@ -170,14 +170,21 @@ int8_t Horizontal::calibrate() {
     max_step_left = get_current_step();
 
     // move right to just bevore the end switch
+    // end to end should be about 16497 steps
     set_speed(200);
-    move_steps(-2200);
+    move_steps(-200);
+    set_speed(230);
+    move_steps(-100);
+    set_speed(240);
+    move_steps(-100);
+    set_speed(250);
+    move_steps(-15000);
+    set_speed(200);
+    move_steps(-400);
     set_speed(150);
-    move_steps(-150);
-    set_speed(100);
-    move_steps(-150);
+    move_steps(-200);
 
-    set_speed(50);
+    set_speed(100);
 
     // move right until hitting the end switch
     while (!pin_read(end_right_pin))
@@ -198,7 +205,7 @@ int8_t Horizontal::calibrate() {
     std::cout << "calibrated: angle=" << (int)angle_size << "°, steps=" << n_steps << " with " << ((double)angle_size / n_steps) << "° per step" << std::endl;
 
     // move to center
-    set_speed(150);
+    set_speed(200);
     move_absolute_angle(0);
 
     step_delay_us = old_delay;
