@@ -29,7 +29,7 @@ gpiod_line* get_pin(gpiod_chip* chip, unsigned int pin, bool is_input, bool defa
     {
         if (gpiod_line_request_input(line, "Fridrich Turret") < 0)
         {
-            std::cerr << "failed to set to input" << std::endl;
+            std::cerr << "failed to set " << pin << " to input " << std::endl;
             return nullptr;
         }
     }
@@ -37,12 +37,17 @@ gpiod_line* get_pin(gpiod_chip* chip, unsigned int pin, bool is_input, bool defa
     {
         if (gpiod_line_request_output(line, "Fridrich Turret", default_value) < 0)
         {
-            std::cerr << "failed to set to output" << std::endl;
+            std::cerr << "failed to set " << pin << " to output " << pin << std::endl;
             return nullptr;
         }
     }
 
     return line;
+}
+
+void cleanup_pin(pin_t pin)
+{
+    gpiod_line_release(pin);
 }
 
 // implementation for gpiod

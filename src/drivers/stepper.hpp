@@ -66,6 +66,12 @@ namespace stepper {
              * 
              */
             void off() const;
+
+            /**
+             * @brief shutdown all pins
+             * 
+             */
+            void shutdown() const;
     };
 
     class Horizontal : public Base
@@ -139,8 +145,8 @@ namespace stepper {
             const uint16_t steps_per_rev = 26880;  // I think, not sure tho
             uint16_t step_delay_us = 1000;
 
-            const uint8_t max_down_angle = -10;
-            const uint8_t max_up_angle = 60;
+            const int8_t max_down_angle = -20;
+            const int8_t max_up_angle = 60;
             const uint8_t angle_size = max_up_angle - max_down_angle;
 
             pin_t end_up_pin;
@@ -213,5 +219,16 @@ namespace stepper {
              * 
              */
             void off() const;
+
+            /**
+             * @brief shutdown all pins
+             * 
+             */
+            void shutdown() const;
     };
+
+    // shared functions
+    void home_all(Horizontal &hor, Vertical &ver);
+    void all_off(Horizontal &hor, Vertical &ver);
+    void all_shut(Horizontal &hor, Vertical &ver);
 };

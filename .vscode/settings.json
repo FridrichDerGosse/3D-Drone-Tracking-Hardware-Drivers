@@ -10,6 +10,7 @@
         "numeric": "c",
         "create.h": "c",
         "ostream": "cpp",
-        "iostream": "cpp"
+        "iostream": "cpp",
+        "thread": "cpp"
     }
 }

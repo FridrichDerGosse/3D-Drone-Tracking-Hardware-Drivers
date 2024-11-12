@@ -3,6 +3,7 @@
 #include <iostream>
 #include <unistd.h>
 #include <algorithm>
+#include <thread>
 
 using namespace stepper;
 
@@ -102,6 +103,13 @@ void Base::off() const
     pin_write(pins.pin_d, false);
 };
 
+void Base::shutdown() const
+{
+    cleanup_pin(pins.pin_a);
+    cleanup_pin(pins.pin_b);
+    cleanup_pin(pins.pin_c);
+    cleanup_pin(pins.pin_d);
+}
 
 // Horizontal Stepper
 bool Horizontal::check_calibrated() const
@@ -176,18 +184,21 @@ int8_t Horizontal::calibrate() {
     set_speed(230);
     move_steps(-100);
     set_speed(240);
-    move_steps(-100);
-    set_speed(250);
+    move_steps(-400);
+    set_speed(248);
     move_steps(-15000);
     set_speed(200);
-    move_steps(-400);
+    move_steps(-200);
     set_speed(150);
     move_steps(-200);
+
+    // only for non-endswitch alignment
+    move_steps(-400);
 
     set_speed(100);
 
     // move right until hitting the end switch
-    while (!pin_read(end_right_pin))
+    while (0)//!pin_read(end_right_pin))
     {
         if (move_steps(-1) > 0)
         {
@@ -200,15 +211,14 @@ int8_t Horizontal::calibrate() {
 
     // calculate fancy stuff
     n_steps = max_step_left - max_step_right;
-    is_calibrating = false;
 
     std::cout << "calibrated: angle=" << (int)angle_size << "°, steps=" << n_steps << " with " << ((double)angle_size / n_steps) << "° per step" << std::endl;
 
-    // move to center
-    set_speed(200);
-    move_absolute_angle(0);
+    set_speed(150);
+    move_steps(100);
 
     step_delay_us = old_delay;
+    is_calibrating = false;
 
     return 0;
 }
@@ -310,7 +320,7 @@ int8_t Vertical::calibrate() {
     // set speed
     set_speed(50);
 
-    // move left until hitting the end switch
+    // move up until hitting the end switch
     while (!pin_read(end_up_pin))
     {
         if (move_steps(1) > 0)
@@ -329,16 +339,16 @@ int8_t Vertical::calibrate() {
     max_step_up = get_current_step();
 
     // move right to just bevore the end switch
-    set_speed(200);
-    move_steps(-2200);
-    set_speed(150);
-    move_steps(-150);
-    set_speed(100);
-    move_steps(-150);
+    // set_speed(200);
+    // move_steps(-2200);
+    // set_speed(150);
+    // move_steps(-150);
+    // set_speed(100);
+    // move_steps(-150);
 
     set_speed(50);
 
-    // move right until hitting the end switch
+    // move down until hitting the end switch
     while (!pin_read(end_down_pin))
     {
         if (move_steps(-1) > 0)
@@ -352,15 +362,13 @@ int8_t Vertical::calibrate() {
 
     // calculate fancy stuff
     n_steps = max_step_up - max_step_down;
-    is_calibrating = false;
 
     std::cout << "calibrated: angle=" << (int)angle_size << "°, steps=" << n_steps << " with " << ((double)angle_size / n_steps) << "° per step" << std::endl;
 
-    // move to center
-    set_speed(150);
-    move_absolute_angle(0);
+    move_steps(50);
 
     step_delay_us = old_delay;
+    is_calibrating = false;
 
     return 0;
 }
@@ -444,6 +452,8 @@ int8_t Vertical::move_steps(int16_t n)
 double Vertical::get_current_angle() const
 {
     // convert step position to angular position
+    std::cout << "steps: " << (int)max_step_down << ", " << (int)max_step_up << ", curr: " << get_current_step() << std::endl;
+    std::cout << "angle: " << (int)max_down_angle << ", " << (int)max_up_angle << std::endl;
     return map(
         get_current_step(),
         max_step_down,
@@ -462,7 +472,7 @@ void Vertical::move_relative_angle(const double angle_delta)
 void Vertical::move_absolute_angle(const double angle)
 {
     double angle_delta = angle - get_current_angle();
-    std::cout << "moving to " << angle << "°: current angle=" << get_current_angle() << "°, delta: " << angle_delta << "°" << std::endl;
+    std::cout << "moving to " << angle << "°: current angle=" << (int)get_current_angle() << "°, delta: " << angle_delta << "°" << std::endl;
     move_relative_angle(angle_delta);
 };
 
@@ -477,4 +487,39 @@ void Vertical::off() const
     pin_write(pins_right.pin_b, false);
     pin_write(pins_right.pin_c, false);
     pin_write(pins_right.pin_d, false);
+}
+
+void Vertical::shutdown() const
+{
+    cleanup_pin(pins_left.pin_a);
+    cleanup_pin(pins_left.pin_b);
+    cleanup_pin(pins_left.pin_c);
+    cleanup_pin(pins_left.pin_d);
+
+    cleanup_pin(pins_right.pin_a);
+    cleanup_pin(pins_right.pin_b);
+    cleanup_pin(pins_right.pin_c);
+    cleanup_pin(pins_right.pin_d);
+}
+
+// combined functions
+void stepper::home_all(Horizontal &hor, Vertical &ver)
+{
+    std::thread tmp_thread(&stepper::Horizontal::calibrate, hor);
+    ver.move_absolute_angle(0);
+
+    if (tmp_thread.joinable())
+        tmp_thread.join();
+}
+
+void stepper::all_off(Horizontal &hor, Vertical &ver)
+{
+    hor.off();
+    ver.off();
+}
+
+void stepper::all_shut(Horizontal &hor, Vertical &ver)
+{
+    hor.shutdown();
+    ver.shutdown();
 }

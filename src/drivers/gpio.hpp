@@ -10,16 +10,6 @@
 
 #include <gpiod.h>
 
-#define A 0
-#define B 8
-#define C 16
-#define D 4
-
-// typedef struct {
-//     gpiod_chip* chip_name;
-//     gpiod_line* pin_number;
-// } pin_t;
-
 typedef gpiod_line* pin_t;
 
 /**
@@ -42,6 +32,12 @@ gpiod_line* get_pin(
     bool is_input,
     bool default_value = false
 );
+
+/**
+ * @brief release / clean up the pin
+ * 
+ */
+void cleanup_pin(pin_t pin);
 
 /**
  * @brief set a pins satate

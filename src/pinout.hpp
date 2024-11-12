@@ -1,29 +1,32 @@
 #pragma once
 
-#include "drivers/gpio.hpp"
+#define A 0
+#define B 8
+#define C 16
+#define D 4
+
 
 // steppers
-#define STEPPER0_CHIP "gpiochip3"
-#define STEPPER0_IN1 B+3
-#define STEPPER0_IN2 B+2
-#define STEPPER0_IN3 B+1
-#define STEPPER0_IN4 B+6
+#define YAW_CHIP "gpiochip4"
+#define YAW_IN1 B+3
+#define YAW_IN2 B+2
+#define YAW_IN3 C+4
+#define YAW_IN4 C+6
 
-#define STEPPER1_CHIP "gpiochip?"
-#define STEPPER1_IN1 0
-#define STEPPER1_IN2 0
-#define STEPPER1_IN3 0
-#define STEPPER1_IN4 0
+#define PITCH_CHIP "gpiochip3"
+#define PITCH_LEFT_IN1 B+5
+#define PITCH_LEFT_IN2 A+4
+#define PITCH_LEFT_IN3 C+2
+#define PITCH_LEFT_IN4 A+7
 
-#define STEPPER2_CHIP "gpiochip?"
-#define STEPPER2_IN1 0
-#define STEPPER2_IN2 0
-#define STEPPER2_IN3 0
-#define STEPPER2_IN4 0
+#define PITCH_RIGHT_IN1 B+6
+#define PITCH_RIGHT_IN2 B+1
+#define PITCH_RIGHT_IN3 B+2
+#define PITCH_RIGHT_IN4 B+3
 
 // end-switches
-#define END_SWITCH_LEFT A+7
-#define END_SWITCH_RIGHT C+2
+#define END_SWITCH_LEFT B+7
+#define END_SWITCH_RIGHT A+0
 
-#define END_SWITCH_UP 0
-#define END_SWITCH_DOWN 0
+#define END_SWITCH_UP C+3
+#define END_SWITCH_DOWN C+1
