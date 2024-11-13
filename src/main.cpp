@@ -38,8 +38,7 @@ int main()
     auto pitch_right_d = get_pin(pitch_chip, PITCH_RIGHT_IN2, false, false);  // in 2
 
     // iitialize end switch pins
-    auto esl = get_pin(gpio1, END_SWITCH_LEFT, true);
-    auto esr = get_pin(gpio0, END_SWITCH_RIGHT, true);
+    auto eslr = get_pin(gpio1, END_SWITCH_LR, true);
 
     auto esu = get_pin(pitch_chip, END_SWITCH_UP, true);
     auto esd = get_pin(pitch_chip, END_SWITCH_DOWN, true);
@@ -52,8 +51,7 @@ int main()
     // initialize stepper drivers
     stepper::Horizontal horizontal_stepper(
         horizontal_pins,
-        esr,
-        esl
+        eslr
     );
 
     stepper::Vertical vstepper(

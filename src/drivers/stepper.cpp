@@ -123,15 +123,14 @@ bool Horizontal::can_move() const
     if (is_calibrating)
         return true;
 
-    return !pin_read(end_left_pin) and !pin_read(end_right_pin);
+    return !pin_read(end_switch_pin);
 }
 
 Horizontal::Horizontal(
     const stepper_pinout_t pins,
-    const pin_t end_left,
-    const pin_t end_right
+    const pin_t end_switch
 )
-    : Base(pins), end_left_pin(end_left), end_right_pin(end_right)
+    : Base(pins), end_switch_pin(end_switch)
 {};
 
 double Horizontal::get_current_angle() const
@@ -160,17 +159,12 @@ int8_t Horizontal::calibrate() {
     set_speed(200);
 
     // move left until hitting the end switch
-    while (!pin_read(end_left_pin))
+    while (!pin_read(end_switch_pin))
     {
         if (move_steps(1) > 0)
         {
             std::cerr << "error aligning: stepper can't find end switch" << std::endl;
             return 1;
-        }
-        
-        if (pin_read(end_right_pin))
-        {
-            std::cerr << "error aligning: wrong end switch touched - check wiring" << std::endl;
         }
     }
 
@@ -198,7 +192,7 @@ int8_t Horizontal::calibrate() {
     set_speed(100);
 
     // move right until hitting the end switch
-    while (0)//!pin_read(end_right_pin))
+    while (!pin_read(end_switch_pin))
     {
         if (move_steps(-1) > 0)
         {

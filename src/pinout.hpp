@@ -1,9 +1,18 @@
+/**
+ * @file pinout.hpp
+ * @author Nilusink
+ * @brief pinout configuration
+ * @version 1.0
+ * @date 2024-11-10
+ *
+ */
 #pragma once
 
+// Armsom GPIO naming convention
 #define A 0
 #define B 8
 #define C 16
-#define D 4
+#define D 24
 
 
 // steppers
@@ -25,8 +34,7 @@
 #define PITCH_RIGHT_IN4 B+3
 
 // end-switches
-#define END_SWITCH_LEFT B+7
-#define END_SWITCH_RIGHT A+0
+#define END_SWITCH_LR A+0
 
 #define END_SWITCH_UP C+3
 #define END_SWITCH_DOWN C+1

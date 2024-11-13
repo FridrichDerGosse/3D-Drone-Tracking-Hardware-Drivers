@@ -85,8 +85,7 @@ namespace stepper {
         protected:
             const uint8_t angle_size = 120;
 
-            pin_t end_left_pin;
-            pin_t end_right_pin;
+            pin_t end_switch_pin;
 
             // internal functions
             bool can_move() const; // later used for end-switches
@@ -94,8 +93,7 @@ namespace stepper {
         public:
             Horizontal(
                 stepper_pinout_t pins,
-                pin_t end_left,
-                pin_t end_right
+                pin_t end_switch
             );
 
             int8_t calibrate();
