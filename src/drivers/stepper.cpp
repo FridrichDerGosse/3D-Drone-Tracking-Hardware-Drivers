@@ -168,7 +168,6 @@ int8_t Horizontal::calibrate() {
         }
     }
 
-
     max_step_left = get_current_step();
 
     // move right to just bevore the end switch
@@ -179,15 +178,15 @@ int8_t Horizontal::calibrate() {
     move_steps(-100);
     set_speed(240);
     move_steps(-400);
-    set_speed(248);
+    set_speed(240);
     move_steps(-15000);
     set_speed(200);
     move_steps(-200);
     set_speed(150);
     move_steps(-200);
 
-    // only for non-endswitch alignment
-    move_steps(-400);
+    // // only for non-endswitch alignment
+    // move_steps(-400);
 
     set_speed(100);
 
@@ -257,7 +256,7 @@ void Horizontal::move_absolute_angle(const double angle)
 };
 
 
-// -------------------------------------- Vertical^
+// -------------------------------------- Vertical
 void Vertical::update_pins() const
 {
     // two stepper with reversed direction

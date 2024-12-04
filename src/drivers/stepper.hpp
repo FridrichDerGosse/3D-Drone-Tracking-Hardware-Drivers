@@ -83,7 +83,7 @@ namespace stepper {
             bool is_calibrating = false;
 
         protected:
-            const uint8_t angle_size = 120;
+            const uint8_t angle_size = 220;
 
             pin_t end_switch_pin;
 

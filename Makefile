@@ -3,8 +3,7 @@
 CARG = 
 LARG = 
 USER = armsom
-# HOST = 192.168.68.88
-HOST = 192.168.68.56
+HOST = 192.168.68.58
 LCORES =-j8
 RCORES =-j4
 
