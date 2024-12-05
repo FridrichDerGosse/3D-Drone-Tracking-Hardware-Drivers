@@ -135,6 +135,9 @@ Horizontal::Horizontal(
 
 double Horizontal::get_current_angle() const
 {
+    std::cout << "current step: " << get_current_step() << std::endl;
+    std::cout << "max left: " << max_step_left << ", right: " << max_step_right << std::endl;
+
     // convert step position to angular position
     return map(
         get_current_step(),
@@ -205,6 +208,8 @@ int8_t Horizontal::calibrate() {
     // calculate fancy stuff
     n_steps = max_step_left - max_step_right;
 
+    std::cout << "current step: " << get_current_step() << std::endl;
+    std::cout << "max left: " << max_step_left << ", right: " << max_step_right << std::endl;
     std::cout << "calibrated: angle=" << (int)angle_size << "°, steps=" << n_steps << " with " << ((double)angle_size / n_steps) << "° per step" << std::endl;
 
     set_speed(150);
@@ -445,8 +450,8 @@ int8_t Vertical::move_steps(int16_t n)
 double Vertical::get_current_angle() const
 {
     // convert step position to angular position
-    std::cout << "steps: " << (int)max_step_down << ", " << (int)max_step_up << ", curr: " << get_current_step() << std::endl;
-    std::cout << "angle: " << (int)max_down_angle << ", " << (int)max_up_angle << std::endl;
+    // std::cout << "steps: " << (int)max_step_down << ", " << (int)max_step_up << ", curr: " << get_current_step() << std::endl;
+    // std::cout << "angle: " << (int)max_down_angle << ", " << (int)max_up_angle << std::endl;
     return map(
         get_current_step(),
         max_step_down,
@@ -498,7 +503,7 @@ void Vertical::shutdown() const
 // combined functions
 void stepper::home_all(Horizontal &hor, Vertical &ver)
 {
-    std::thread tmp_thread(&stepper::Horizontal::calibrate, hor);
+    std::thread tmp_thread(&stepper::Horizontal::move_absolute_angle, hor, 0);
     ver.move_absolute_angle(0);
 
     if (tmp_thread.joinable())
