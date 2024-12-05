@@ -1,6 +1,11 @@
 # --> flash debian to armsom SD card
+function update_system
+{
+    # update system
+    sudo apt update && sudo apt upgrade -y
+}
 
-function setup_camera()
+function setup_camera
 {
     # download camera driver package and install
     cd Downloads
@@ -9,13 +14,22 @@ function setup_camera()
     reboot
 }
 
-function setup_gpio()
+function setup_gpio
 {
     # setup gpiod for c++ and python
     sudo apt install gpiod libgpiod-dev python3-dev -y
     pip install gpiod
 }
 
+function setup_opencv
+{
+    sudo apt install python3-opencv
+    echo "installed opencv version: "
+    python3 -c "import cv2; print(cv2.__version__)"
+}
 
+
+update_system
 setup_gpio
 setup_camera
+setup_opencv
