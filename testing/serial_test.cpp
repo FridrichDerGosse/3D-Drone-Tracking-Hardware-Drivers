@@ -1,52 +1,35 @@
 #include <string>
 #include <fstream>
+#include <unistd.h>
 #include <iostream>
-#include <nlohmann/json.hpp>
-#include "drivers/CppLinuxSerial/SerialPort.hpp"
-
-// Linux headers
-#include <fcntl.h> // Contains file controls like O_RDWR
-#include <errno.h> // Error integer and strerror() function
-#include <termios.h> // Contains POSIX terminal control definitions
-#include <unistd.h> // write(), read(), close()
+#include "drivers/serial.hpp"
 
 
-using json = nlohmann::json;
-using namespace mn::CppLinuxSerial;
+int main() {
+    serial::SimpleSerial nano("/dev/ttyUSB0");
+    nano.begin(9600);
 
+    std::cout << "Setup device " << std::endl;
 
-int main()
-{
-    SerialPort serialPort("/dev/ttyUSB0", BaudRate::B_9600, NumDataBits::EIGHT, Parity::NONE, NumStopBits::ONE);
-    serialPort.SetTimeout(100); // Block for up to 100ms to receive data
-	serialPort.Open();
+    // wait two seconds
+    usleep(2000000);
 
-    std::cout << "started" << std::endl;
+    // Write to the serial device
+    const char* message = "{\"type\": 2}\0";
+    int bytes_written = nano.write(message);
 
-    // request laser range
-    json request = {
-        {"type", 2}
-    };
+    std::cout << "Sent " << bytes_written << " bytes to the serial device." << std::endl;
 
-    // send request to nano
-    serialPort.Write(request.dump());
+    // Read from the serial device
+    while (!nano.available()) { usleep(10000); }
 
-    std::string readData;
-    for (;;)
-    {
-        // wait for reply
-        if (serialPort.Available())
-        {
-            serialPort.Read(readData);
+    std::string buffer;
+    nano.read(buffer, 100);
 
-            // convert data to json
-            json reply = json::parse(readData);
-            std::cout << "laser request data:" << reply << std::endl;
+    std::cout << "Received: " << buffer << std::endl;
 
-            return 0;
-        }
+    // Close the serial port
+    nano.close();
 
-        // wait for 10ms
-        usleep(10000);
-    }
+    return EXIT_SUCCESS;
 }

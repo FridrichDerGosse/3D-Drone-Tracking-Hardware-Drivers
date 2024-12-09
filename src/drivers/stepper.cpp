@@ -142,8 +142,10 @@ Horizontal::Horizontal(
 double Horizontal::get_current_angle() const
 {
     if (debugging)
+    {
         std::cout << "current step: " << get_current_step() << std::endl;
         std::cout << "max left: " << max_step_left << ", right: " << max_step_right << std::endl;
+    }
 
     // convert step position to angular position
     return map(
@@ -220,9 +222,11 @@ int8_t Horizontal::calibrate() {
     n_steps = max_step_left - max_step_right;
 
     if (debugging)
+    {
         std::cout << "current step: " << get_current_step() << std::endl;
         std::cout << "max left: " << max_step_left << ", right: " << max_step_right << std::endl;
         std::cout << "calibrated: angle=" << (int)angle_size << "°, steps=" << n_steps << " with " << ((double)angle_size / n_steps) << "° per step" << std::endl;
+    }
 
     set_speed(150);
     move_steps(100);

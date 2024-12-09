@@ -11,39 +11,11 @@
 #include <gpiod.h>
 #include <unistd.h>
 #include <thread>
-#include <chrono>
-#include <atomic>
 #include <memory>
 
 #include "drivers/stepper.hpp"
 #include "drivers/serial.hpp"
 #include "pinout.hpp"
-
-
-void alignment_countdown(std::atomic<bool>& finished_flag)
-{
-    // set starting time
-    auto start = std::chrono::high_resolution_clock::now();
-
-    
-    // wait for finished flag to be set
-    std::chrono::microseconds delta;
-    std::chrono::_V2::system_clock::time_point now;
-    while (!finished_flag)
-    {
-        now = std::chrono::high_resolution_clock::now();
-        delta = std::chrono::duration_cast<std::chrono::microseconds>(now - start);
-
-        // count down from 70 (1 minute and 10 seconds)
-        std::cout << "\rtime left: " << std::setw(4) << std::setfill(' ') << std::left << std::fixed << std::setprecision(1) << (70.f - delta.count() / 1000000.f) << " seconds" << std::flush;
-
-        // wait 100 ms
-        usleep(100000);
-    }
-
-    // print total alignment time
-    std::cout << "\rAlignment took " << std::fixed << std::setprecision(2) << (delta.count() / 1000000.f) << " seconds" << std::endl;
-}
 
 
 int main()
@@ -100,13 +72,6 @@ int main()
     );
 
     // calibrate steppers
-    std::cout << "calibrating turret ..." << std::endl;
-
-    // countdown thread
-    std::atomic<bool> alignment_flag(false);
-    std::thread clock_thread(alignment_countdown, std::ref(alignment_flag));
-
-    // horizontal stepper alignment
     std::thread tmp_thread(&stepper::Horizontal::calibrate, &horizontal_stepper);
 
     // wait two seconds for vertical to start
@@ -117,13 +82,6 @@ int main()
     // make sure all steppers are aligend
     if (tmp_thread.joinable())
         tmp_thread.join();
-
-    // finish clock thread
-    alignment_flag = true;
-    if (clock_thread.joinable())
-        clock_thread.join();
-
-    std::cout << "homing turret ..." << std::endl;
 
     // set speeds
     horizontal_stepper.set_speed(230);
@@ -137,6 +95,8 @@ int main()
     // make sure all steppers have moved
     if (tmp_thread.joinable())
         tmp_thread.join();
+
+    std::cout << "alignment done" << std::endl;
 
     std::cout << "syntax: <direction (h,v for absolute): u,d,l,r> <ammount in °>" << std::endl;
     std::cout << "alternatively, input <\"e\" to exit, \"c\" to confirm or \"m\" to measure> + <random number>" << std::endl;
@@ -182,48 +142,9 @@ int main()
             break;
 
         case 'c':
-        {
-            std::cout << "measuring ..." << std::endl;
-
-            // request laser measurement
-            nano.write_json({{"type", 2}});
-            auto data = nano.read_json();
-
-            if (!data["valid"])
-            {
-                std::cout << "tof measurement failure" << std::endl;
-                break;
-            }
-
-            std::cout << "position: ";
-            std::cout << std::fixed << std::setprecision(3) << vstepper.get_current_angle() << "°v, ";
-            std::cout << std::fixed << std::setprecision(3) << horizontal_stepper.get_current_angle() << "°h at ";
-            std::cout << std::fixed << std::setprecision(3) << data["distance"] << "m locked" << std::endl;
-            std::cout << "exiting" << std::endl;
-            running = false;
+            std::cout << "position (" << vstepper.get_current_angle() << "°v, ";
+            std::cout << horizontal_stepper.get_current_angle() << "°h) locked" << std::endl;
             break;
-        }
-
-        case 'm':
-        {
-            std::cout << "measuring ..." << std::endl;
-
-            // request laser measurement
-            nano.write_json({{"type", 2}});
-            auto data = nano.read_json();
-
-            if (!data["valid"])
-            {
-                std::cout << "tof measurement failure" << std::endl;
-                break;
-            }
-
-            std::cout << "position: ";
-            std::cout << std::fixed << std::setprecision(3) << vstepper.get_current_angle() << "°v, ";
-            std::cout << std::fixed << std::setprecision(3) << horizontal_stepper.get_current_angle() << "°h at ";
-            std::cout << std::fixed << std::setprecision(3) << data["distance"] << "m measured" << std::endl;
-            break;
-        }
 
         case 'e':
             std::cout << "exiting" << std::endl;
