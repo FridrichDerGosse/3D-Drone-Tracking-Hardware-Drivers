@@ -37,6 +37,9 @@ namespace stepper {
             bool can_move() const; // later used for end-switches
 
         public:
+            bool warnings = true;
+            bool debugging = false;
+
             explicit Base(stepper_pinout_t pins);
 
             /**
@@ -158,6 +161,9 @@ namespace stepper {
             bool can_move() const; // later used for end-switches
         
         public:
+            bool warnings = true;
+            bool debugging = false;
+
             Vertical(
                 stepper_pinout_t pins_left,
                 stepper_pinout_t pins_right,

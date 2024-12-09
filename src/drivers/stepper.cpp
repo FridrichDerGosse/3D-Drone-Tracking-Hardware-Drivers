@@ -58,7 +58,9 @@ int8_t Base::move_steps(int16_t n) {
     // check if movement is allowed
     if (!can_move())
     {
-        std::cout << "can't move" << std::endl;
+        if (warnings)
+            std::cout << "can't move" << std::endl;
+    
         return 4;
     }
 
@@ -69,7 +71,9 @@ int8_t Base::move_steps(int16_t n) {
 
         if (!can_move())
         {
-            std::cout << "hit end switch" << std::endl;
+            if (warnings)
+                std::cout << "hit end switch" << std::endl;
+        
             return 5;
         }
 
@@ -84,7 +88,9 @@ int8_t Base::move_steps(int16_t n) {
 
         if (!can_move())
         {
-            std::cout << "hit end switch" << std::endl;
+            if (warnings)
+                std::cout << "hit end switch" << std::endl;
+        
             return 5;
         }
 
@@ -135,8 +141,9 @@ Horizontal::Horizontal(
 
 double Horizontal::get_current_angle() const
 {
-    std::cout << "current step: " << get_current_step() << std::endl;
-    std::cout << "max left: " << max_step_left << ", right: " << max_step_right << std::endl;
+    if (debugging)
+        std::cout << "current step: " << get_current_step() << std::endl;
+        std::cout << "max left: " << max_step_left << ", right: " << max_step_right << std::endl;
 
     // convert step position to angular position
     return map(
@@ -166,7 +173,9 @@ int8_t Horizontal::calibrate() {
     {
         if (move_steps(1) > 0)
         {
-            std::cerr << "error aligning: stepper can't find end switch" << std::endl;
+            if (warnings)
+                std::cerr << "error aligning: stepper can't find end switch" << std::endl;
+    
             return 1;
         }
     }
@@ -198,7 +207,9 @@ int8_t Horizontal::calibrate() {
     {
         if (move_steps(-1) > 0)
         {
-            std::cerr << "error aligning: stepper can't find end switch" << std::endl;
+            if (warnings)
+                std::cerr << "error aligning: stepper can't find end switch" << std::endl;
+    
             return 1;
         }
     }
@@ -208,9 +219,10 @@ int8_t Horizontal::calibrate() {
     // calculate fancy stuff
     n_steps = max_step_left - max_step_right;
 
-    std::cout << "current step: " << get_current_step() << std::endl;
-    std::cout << "max left: " << max_step_left << ", right: " << max_step_right << std::endl;
-    std::cout << "calibrated: angle=" << (int)angle_size << "°, steps=" << n_steps << " with " << ((double)angle_size / n_steps) << "° per step" << std::endl;
+    if (debugging)
+        std::cout << "current step: " << get_current_step() << std::endl;
+        std::cout << "max left: " << max_step_left << ", right: " << max_step_right << std::endl;
+        std::cout << "calibrated: angle=" << (int)angle_size << "°, steps=" << n_steps << " with " << ((double)angle_size / n_steps) << "° per step" << std::endl;
 
     set_speed(150);
     move_steps(100);
@@ -224,39 +236,49 @@ int8_t Horizontal::calibrate() {
 int8_t Horizontal::move_steps(int16_t n) {
     if (!check_calibrated() && !is_calibrating)
     {
-        std::cerr << "can't move, not calibrated yet!" << std::endl;
+        if (warnings)
+            std::cerr << "can't move, not calibrated yet!" << std::endl;
+    
         return 1;
     }
 
     if (get_current_step() + n > max_step_left)
     {
-        std::cerr << "steps out of moveable range, moving to max left" << std::endl;
+        if (warnings)
+            std::cerr << "steps out of moveable range, moving to max left" << std::endl;
         n = max_step_left - get_current_step();
         return 2;
     }
 
     if (get_current_step() + n < max_step_right)
     {
-        std::cerr << "steps out of moveable range, moving to max right" << std::endl;
+        if (warnings)
+            std::cerr << "steps out of moveable range, moving to max right" << std::endl;
         n = max_step_right - get_current_step();
         return 3;
     }
 
-    std::cout << "moving by " << n << " steps. Current step:" << get_current_step() << std::endl;
+    if (debugging)
+        std::cout << "moving by " << n << " steps. Current step:" << get_current_step() << std::endl;
 
     return Base::move_steps(n);
 };
 
 void Horizontal::move_relative_angle(const double angle_delta)
 {
-    std::cout << "moving by " << angle_delta << "° / " << ((double)angle_size / n_steps) << " degrees per step = " << (angle_delta / ((double)angle_size / n_steps)) << std::endl;
+    if (debugging)
+        std::cout << "moving by " << angle_delta << "° / " << ((double)angle_size / n_steps) << " degrees per step = " << (angle_delta / ((double)angle_size / n_steps)) << std::endl;
+    
     move_steps(angle_delta / ((double)angle_size / n_steps));
 };
 
 void Horizontal::move_absolute_angle(const double angle)
 {
     double angle_delta = angle - get_current_angle();
-    std::cout << "moving to " << angle << "°: current angle=" << get_current_angle() << "°, delta: " << angle_delta << "°" << std::endl;
+
+    if (debugging)
+        std::cout << "moving to " << angle << "°: current angle=" << get_current_angle() << "°, delta: " << angle_delta << "°" << std::endl;
+    
     move_relative_angle(angle_delta);
 };
 
@@ -323,13 +345,18 @@ int8_t Vertical::calibrate() {
     {
         if (move_steps(1) > 0)
         {
-            std::cerr << "error aligning: stepper can't find end switch" << std::endl;
+            if (warnings)
+                std::cerr << "error aligning: stepper can't find end switch" << std::endl;
+        
             return 1;
         }
         
         if (pin_read(end_down_pin))
         {
-            std::cerr << "error aligning: wrong end switch touched - check wiring" << std::endl;
+            if (warnings)
+                std::cerr << "error aligning: wrong end switch touched - check wiring" << std::endl;
+            
+            return 2;
         }
     }
 
@@ -351,7 +378,9 @@ int8_t Vertical::calibrate() {
     {
         if (move_steps(-1) > 0)
         {
-            std::cerr << "error aligning: stepper can't find end switch" << std::endl;
+            if (warnings)
+                std::cerr << "error aligning: stepper can't find end switch" << std::endl;
+    
             return 1;
         }
     }
@@ -361,7 +390,8 @@ int8_t Vertical::calibrate() {
     // calculate fancy stuff
     n_steps = max_step_up - max_step_down;
 
-    std::cout << "calibrated: angle=" << (int)angle_size << "°, steps=" << n_steps << " with " << ((double)angle_size / n_steps) << "° per step" << std::endl;
+    if (debugging)
+        std::cout << "calibrated: angle=" << (int)angle_size << "°, steps=" << n_steps << " with " << ((double)angle_size / n_steps) << "° per step" << std::endl;
 
     move_steps(50);
 
@@ -387,30 +417,39 @@ int8_t Vertical::move_steps(int16_t n)
 {
     if (!check_calibrated() && !is_calibrating)
     {
-        std::cerr << "can't move, not calibrated yet!" << std::endl;
+        if (warnings)
+            std::cerr << "can't move, not calibrated yet!" << std::endl;
+    
         return 1;
     }
 
     if (get_current_step() + n > max_step_up)
     {
-        std::cerr << "steps out of moveable range, moving to max left" << std::endl;
+        if (warnings)
+            std::cerr << "steps out of moveable range, moving to max left" << std::endl;
+    
         n = max_step_up - get_current_step();
         return 2;
     }
 
     if (get_current_step() + n < max_step_down)
     {
-        std::cerr << "steps out of moveable range, moving to max right" << std::endl;
+        if (warnings)
+            std::cerr << "steps out of moveable range, moving to max right" << std::endl;
+    
         n = max_step_down - get_current_step();
         return 3;
     }
 
-    std::cout << "moving by " << n << " steps. Current step:" << get_current_step() << std::endl;
+    if (debugging)
+        std::cout << "moving by " << n << " steps. Current step:" << get_current_step() << std::endl;
 
     // check if movement is allowed
     if (!can_move())
     {
-        std::cout << "can't move" << std::endl;
+        if (warnings)
+            std::cout << "can't move" << std::endl;
+        
         return 4;
     }
 
@@ -421,7 +460,9 @@ int8_t Vertical::move_steps(int16_t n)
 
         if (!can_move())
         {
-            std::cout << "hit end switch" << std::endl;
+            if (warnings)
+                std::cout << "hit end switch" << std::endl;
+    
             return 5;
         }
 
@@ -436,7 +477,9 @@ int8_t Vertical::move_steps(int16_t n)
 
         if (!can_move())
         {
-            std::cout << "hit end switch" << std::endl;
+            if (warnings)
+                std::cout << "hit end switch" << std::endl;
+
             return 5;
         }
 
@@ -463,14 +506,19 @@ double Vertical::get_current_angle() const
 
 void Vertical::move_relative_angle(const double angle_delta)
 {
-    std::cout << "moving by " << angle_delta << "° / " << ((double)angle_size / n_steps) << " degrees per step = " << (angle_delta / ((double)angle_size / n_steps)) << std::endl;
+    if (debugging)
+        std::cout << "moving by " << angle_delta << "° / " << ((double)angle_size / n_steps) << " degrees per step = " << (angle_delta / ((double)angle_size / n_steps)) << std::endl;
+    
     move_steps(angle_delta / ((double)angle_size / n_steps));
 };
 
 void Vertical::move_absolute_angle(const double angle)
 {
     double angle_delta = angle - get_current_angle();
-    std::cout << "moving to " << angle << "°: current angle=" << (int)get_current_angle() << "°, delta: " << angle_delta << "°" << std::endl;
+
+    if (debugging)
+        std::cout << "moving to " << angle << "°: current angle=" << (int)get_current_angle() << "°, delta: " << angle_delta << "°" << std::endl;
+    
     move_relative_angle(angle_delta);
 };
 
