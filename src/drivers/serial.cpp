@@ -7,6 +7,34 @@
 #include "serial.hpp"
 
 
+// chat-gpt function
+ssize_t read_with_timeout(int fd, void* buf, size_t count, int timeout_ms) {
+    fd_set read_fds;
+    struct timeval timeout;
+
+    // Configure the timeout
+    timeout.tv_sec = timeout_ms / 1000;
+    timeout.tv_usec = (timeout_ms % 1000) * 1000;
+
+    // Initialize the set of file descriptors
+    FD_ZERO(&read_fds);
+    FD_SET(fd, &read_fds);
+
+    // Wait for the file descriptor to become ready
+    int result = select(fd + 1, &read_fds, nullptr, nullptr, &timeout);
+    if (result < 0) {
+        // Error occurred
+        perror("select");
+        return -1;
+    } else if (result == 0) {
+        // Timeout
+        return 0; // No data available within the timeout
+    }
+
+    // File descriptor is ready; perform the read
+    return read(fd, buf, count);
+}
+
 using namespace serial;
 
 speed_t serial::get_baud_rate(int baud) {
@@ -91,31 +119,43 @@ int serial::write_message(int port, const char *message)
     return bytesWritten;
 }
 
-bool serial::read_message(int port, std::string &buffer, int timeout)
+bool serial::read_message(int port, std::string &buffer, int timeout, bool debugging)
 {
-// bool read_string(std::string &buffer, int serial_fd, unsigned int timeout) {
-    buffer.clear(); // Ensure the buffer starts empty
+    buffer.clear();
     unsigned int current_timeout = 0;
     const unsigned int delay_interval = 5; // 5 ms delay between checks
 
-    while (current_timeout < timeout) {
+    if (debugging)
+        std::cout << "waiting to receive data" << std::endl;
+
+    while (current_timeout < timeout)
+    {
         char tmp;
 
-        // Check if data is available on the serial port
-        ssize_t bytes_read = read(port, &tmp, 1);
-        if (bytes_read > 0) {
-            current_timeout = 0; // Reset timeout when data is received
+        // check if data is available on the serial port
+        ssize_t bytes_read = read_with_timeout(port, &tmp, 1, delay_interval);
+        if (bytes_read > 0)
+        {
+            if (debugging)
+                std::cout << "received: \"" << tmp << "\"" << std::endl;
 
-            if (tmp == '\0') {
-                break; // Null character indicates end of string
+            current_timeout = 0;
+
+            // terminator
+            if (tmp == '\0')
+            {
+                break;
             }
 
             buffer.push_back(tmp); // Append character to buffer
             continue;
         }
 
+        if (debugging)
+            std::cout << "\rno data available, timeout: " << current_timeout << std::endl;
+
         // No data available, wait and increment timeout
-        usleep(delay_interval);
+        // usleep(delay_interval);
         current_timeout += delay_interval;
     }
 
@@ -175,6 +215,23 @@ bool SimpleSerial::available()
     return result > 0; // If result is greater than 0, data is available
 }
 
+void SimpleSerial::clear_input()
+{
+    std::string buff;
+
+    if (debugging)
+        std::cout << "clearing input ..." << std::endl;
+
+    // read while available
+    while (available())
+    {
+        read(buff, 30);
+
+        if (debugging && buff.length() > 0)
+            std::cout << "cleaning read: " << buff << std::endl;
+    }
+}
+
 int SimpleSerial::write(const std::string &message)
 {
     return serial::write_message(port, message.c_str());
@@ -182,6 +239,9 @@ int SimpleSerial::write(const std::string &message)
 
 int SimpleSerial::write_json(json data)
 {
+    if (debugging)
+        std::cout << "writing json: " << (data.dump() + '\0') << std::endl;
+
     // dump to json and add \0 as terminator
     return write(data.dump() + '\0');
 }
@@ -191,17 +251,61 @@ bool SimpleSerial::read(std::string &buffer, int timeout)
     return serial::read_message(port, buffer, timeout);
 }
 
-json SimpleSerial::read_json(int timeout)
+std::pair<bool, json> SimpleSerial::read_json(int timeout)
 {
     // read data as string
     std::string read_buff;
     // if (!read(read_buff))
         // return false;
 
+    if (debugging)
+        std::cout << "waiting to receive" << std::endl;
+
     read(read_buff);
 
+    if (read_buff.length() < 2)
+    {
+        if (debugging)
+            std::cout << "invalid receive: " << read_buff << std::endl;
+        
+        if (!available())
+        {
+            if (debugging)
+                std::cout << "new message available, retrying" << std::endl;
+
+            return read_json(timeout);
+        }
+
+        // create a fake false acknowledgement for receive fail
+        return {false, {{"type", 0}, {"ack", 0}, {"valid", 0}}};
+    }
+
+    // clean string up
+    // read_buff.erase(std::remove_if(read_buff.begin(), read_buff.end(), ::isspace), read_buff.end());
+    read_buff.erase(std::remove(read_buff.begin(), read_buff.end(), '\0'), read_buff.end());
+
+
+    if (debugging)
+    {
+        std::cout << "converting \"" << read_buff << "\" to json: ";
+        for (unsigned char c : read_buff) {
+            std::cout << "\\x" << std::hex << (int)c;
+        }
+        std::cout << std::endl;
+
+        std::string sanitized = "{\"type\":2,\"valid\":false}";
+    }
+
     // convert to json
-    return json::parse(read_buff);
+    try
+    {
+        return {true, json::parse(read_buff)};
+    }
+    catch (const json::exception& e)
+    {
+        std::cerr << "JSON error: " << e.what() << std::endl;
+        return {false, {{"type", 0}, {"ack", 0}, {"valid", 0}}};
+    }
 }
 
 int SimpleSerial::close()

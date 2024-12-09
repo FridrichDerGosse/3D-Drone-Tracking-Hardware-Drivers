@@ -16,7 +16,7 @@
 #include <memory>
 
 #include "drivers/stepper.hpp"
-#include "drivers/serial.hpp"
+#include "drivers/nano.hpp"
 #include "pinout.hpp"
 
 
@@ -46,11 +46,14 @@ void alignment_countdown(std::atomic<bool>& finished_flag)
 }
 
 
+// TODO: Messages are still delayed once (don't ask me how)
+
+
 int main()
 {
     // serial setup
-    serial::SimpleSerial nano("/dev/ttyUSB0");
-    nano.begin(9600);
+    nano::Nano my_nano("/dev/ttyUSB0");
+    my_nano.begin(9600);
 
     // setup chips and pins
     auto gpio0 = get_chip("gpiochip0");
@@ -99,6 +102,10 @@ int main()
         esd
     );
 
+    // turn laser off bevore alignment, also wait 2 seconds for nano to start
+    // usleep(2000000);
+    // my_nano.set_laser_state(0);
+
     // calibrate steppers
     std::cout << "calibrating turret ..." << std::endl;
 
@@ -110,8 +117,6 @@ int main()
     std::thread tmp_thread(&stepper::Horizontal::calibrate, &horizontal_stepper);
 
     // wait two seconds for vertical to start
-    usleep(2000000);
-
     vstepper.calibrate();
 
     // make sure all steppers are aligend
@@ -139,7 +144,12 @@ int main()
         tmp_thread.join();
 
     std::cout << "syntax: <direction (h,v for absolute): u,d,l,r> <ammount in °>" << std::endl;
-    std::cout << "alternatively, input <\"e\" to exit, \"c\" to confirm or \"m\" to measure> + <random number>" << std::endl;
+    std::cout << "alternatively, input: " << std::endl;
+    std::cout << "\t* \"m\": measure" << std::endl;
+    std::cout << "\t* \"c\": confirm" << std::endl;
+    std::cout << "\t* \"e\": exit" << std::endl;
+    std::cout << "\t* \"f\": fan speed (0 to 255)" << std::endl;
+    std::cout << "\t* \"t\": TOF laser on/off (1/0)" << std::endl;
 
     char direction;
     double degrees;
@@ -186,10 +196,9 @@ int main()
             std::cout << "measuring ..." << std::endl;
 
             // request laser measurement
-            nano.write_json({{"type", 2}});
-            auto data = nano.read_json();
+            double distance = my_nano.laser_measure();
 
-            if (!data["valid"])
+            if (distance < 0)
             {
                 std::cout << "tof measurement failure" << std::endl;
                 break;
@@ -198,7 +207,7 @@ int main()
             std::cout << "position: ";
             std::cout << std::fixed << std::setprecision(3) << vstepper.get_current_angle() << "°v, ";
             std::cout << std::fixed << std::setprecision(3) << horizontal_stepper.get_current_angle() << "°h at ";
-            std::cout << std::fixed << std::setprecision(3) << data["distance"] << "m locked" << std::endl;
+            std::cout << std::fixed << std::setprecision(3) << distance << "m locked" << std::endl;
             std::cout << "exiting" << std::endl;
             running = false;
             break;
@@ -209,10 +218,9 @@ int main()
             std::cout << "measuring ..." << std::endl;
 
             // request laser measurement
-            nano.write_json({{"type", 2}});
-            auto data = nano.read_json();
+            double distance = my_nano.laser_measure();
 
-            if (!data["valid"])
+            if (distance < 0)
             {
                 std::cout << "tof measurement failure" << std::endl;
                 break;
@@ -221,7 +229,30 @@ int main()
             std::cout << "position: ";
             std::cout << std::fixed << std::setprecision(3) << vstepper.get_current_angle() << "°v, ";
             std::cout << std::fixed << std::setprecision(3) << horizontal_stepper.get_current_angle() << "°h at ";
-            std::cout << std::fixed << std::setprecision(3) << data["distance"] << "m measured" << std::endl;
+            std::cout << std::fixed << std::setprecision(3) << distance << "m measured" << std::endl;
+
+            // turn laser back on
+            my_nano.set_laser_state(1);
+            break;
+        }
+
+        case 'f':
+        {
+            uint8_t fan_speed = degrees;
+            std::cout << "Setting fan to: " << (int)fan_speed << std::endl;
+
+            // set fan speed and wait for answer
+            my_nano.set_fan_speed(fan_speed);
+            std::cout << "done" << std::endl;
+
+            break;
+        }
+
+        case 't':
+        {
+            bool state = direction == 0;
+            std::cout << "Setting TOF laser to: " << (state ? "on" : "off") << std::endl;
+            std::cout << "Setting " << (my_nano.set_laser_state(state) ? "success": "fail") << std::endl;
             break;
         }
 
