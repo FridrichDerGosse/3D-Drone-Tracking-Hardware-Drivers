@@ -107,6 +107,15 @@ int serial::setup(const char *device, int baud)
     return serialPort;
 }
 
+void serial::flush(int fd)
+{
+    // Clear input and output buffers
+    if (tcflush(fd, TCIOFLUSH) != 0)
+    {
+        std::cerr << "Error flushing serial port: " << strerror(errno) << std::endl;
+    }
+}
+
 int serial::write_message(int port, const char *message)
 {
     ssize_t bytesWritten = write(port, message, strlen(message));
@@ -168,16 +177,115 @@ int serial::close_port(int port)
 }
 
 
+int SimpleSerial::get_unique_id()
+{
+    return id_counter.fetch_add(1);
+}
+
+void SimpleSerial::receive_messages()
+{
+    if (debugging)
+        std::cout << "receive thread started" << std::endl;
+    
+    while (running)
+    {
+        if (available())
+        {
+            if (debugging)
+                std::cout << "message available" << std::endl;
+
+            auto [ok, data] = read_json();
+
+            if (debugging)
+                std::cout << "received (ok=" << ok << "): \"" << data << "\"" << std::endl;
+
+            if (!ok)
+                continue;
+
+            // check if message has an "reply to" key
+            if (data.contains("to"))
+            {
+                if (debugging)
+                    std::cout << "appending" << std::endl;
+
+                received_messages.push_back(data);
+            }
+            else
+            {
+                if (debugging)
+                    std::cout << "doesn't contain \"to\" key" << std::endl;
+            }
+
+            continue;
+        }
+
+        usleep(receive_delay);
+    }
+
+    if (debugging)
+        std::cout << "receive thread exit" << std::endl;
+}
+
+std::pair<bool, json> SimpleSerial::try_get_reply(uint16_t id)
+{
+    // if (debugging)
+    //     std::cout << "trying to find message with id: " << id << std::endl;
+
+    // checks if a message with the correct reply id has been appended
+    for (json message : received_messages)
+    {
+        if (message["to"] == id)
+        {
+            if (debugging)
+                std::cout << "found: " << message << std::endl;
+
+            return {true, message};
+        }
+    }
+
+    // not found
+    return {false, {{"ack", false}}};
+}
+
+std::pair<bool, json> SimpleSerial::try_receive_reply(uint16_t id, int timeout)
+{
+    if (debugging)
+        std::cout << "trying to receive message with id: " << id << std::endl;
+    
+    while (timeout > 0)
+    {
+        auto [found, data] = try_get_reply(id);
+
+        // return message if received
+        if (found)
+            return {true, data};
+        
+        usleep(receive_delay);
+        timeout -= receive_delay;
+    }
+
+    // return dummy false reply
+    return {false, {{"type", 0}, {"ack", 0}, {"valid", 0}}};
+}
+
 SimpleSerial::SimpleSerial(const char *device)
   : device(device)
 {}
 
 SimpleSerial::~SimpleSerial()
 {
+    // tell thread to stop running
+    running = false;
+
+    // close serial port if it hasn't already been done
     if (port != -1)
     {
         close();
     }
+
+    // wait for thread to exit
+    if (receive_thread.joinable())
+        receive_thread.join();
 }
 
 bool SimpleSerial::begin(int baud)
@@ -194,6 +302,10 @@ bool SimpleSerial::begin(int baud)
     }
 
     port = serial::setup(device, baud);
+
+    // start receive function
+    receive_thread = std::thread(&SimpleSerial::receive_messages, this);
+
     return true;
 }
 
@@ -215,35 +327,57 @@ bool SimpleSerial::available()
     return result > 0; // If result is greater than 0, data is available
 }
 
-void SimpleSerial::clear_input()
+// void SimpleSerial::clear_input()
+// {
+//     std::string buff;
+
+//     if (debugging)
+//         std::cout << "clearing input ..." << std::endl;
+
+//     // read while available
+//     while (available())
+//     {
+//         read(buff, 100);
+
+//         if (debugging && buff.length() > 0)
+//             std::cout << "cleaning read: " << buff << std::endl;
+//     }
+//     if (!available() && debugging)
+//         std::cout << "clearing: nothing available" << std::endl;
+// }
+
+void SimpleSerial::flush()
 {
-    std::string buff;
-
     if (debugging)
-        std::cout << "clearing input ..." << std::endl;
+        std::cout << "flushing ..." << std::endl;
 
-    // read while available
-    while (available())
-    {
-        read(buff, 30);
-
-        if (debugging && buff.length() > 0)
-            std::cout << "cleaning read: " << buff << std::endl;
-    }
+    serial::flush(port);
 }
 
 int SimpleSerial::write(const std::string &message)
 {
-    return serial::write_message(port, message.c_str());
+    // write message to serial
+    int rcode = serial::write_message(port, message.c_str());
+
+    // make sure message was written
+    flush();
+
+    return rcode;
 }
 
 int SimpleSerial::write_json(json data)
 {
+    // tag message with unique id
+    data["id"] = get_unique_id();
+
     if (debugging)
         std::cout << "writing json: " << (data.dump() + '\0') << std::endl;
 
+    // write data to serial
+    write(data.dump() + '\0');
+
     // dump to json and add \0 as terminator
-    return write(data.dump() + '\0');
+    return data["id"];
 }
 
 bool SimpleSerial::read(std::string &buffer, int timeout)
@@ -266,7 +400,7 @@ std::pair<bool, json> SimpleSerial::read_json(int timeout)
     if (read_buff.length() < 2)
     {
         if (debugging)
-            std::cout << "invalid receive: " << read_buff << std::endl;
+            std::cout << "invalid receive: \"" << read_buff << "\"" << std::endl;
         
         if (!available())
         {
@@ -310,5 +444,7 @@ std::pair<bool, json> SimpleSerial::read_json(int timeout)
 
 int SimpleSerial::close()
 {
-    return serial::close_port(port);
+    int rtn = serial::close_port(port);
+    port = -1;
+    return rtn;
 }

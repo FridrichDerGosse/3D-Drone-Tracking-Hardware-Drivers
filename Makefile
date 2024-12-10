@@ -4,16 +4,17 @@
 CARG = 
 LARG = 
 USER = armsom
-HOST = 192.168.68.50
+# HOST = 192.168.68.50
+HOST = 10.42.0.48
 LCORES =-j8
-RCORES =-j4
+RCORES =-j7
 
 # project structure
 SRC_DIR = src	
 INCLUDE_DIR = include
 DEV_INCLUDE = devinclude
 OBJ_DIR = obj
-RUN_DIR = run
+RUN_DIR = run	
 MOUNT_FOLDER = mount
 WORKSPACE_NAME = $(shell basename ${PWD})
 

@@ -32,15 +32,15 @@ bool Nano::begin(int baud)
 bool Nano::set_laser_range(uint8_t range)
 {
     // send command to nano
-    clear_input();
-    write_json({
+    // clear_input();
+    int message_id = write_json({
         {"type", TYPE_SET},
         {"target", LASER_RANGE},
         {"value", range}
     });
 
     // receive response
-    auto [status, data] = read_json(timeout);
+    auto [status, data] = try_receive_reply(message_id, 200000);
 
     if (!status)
         return false;
@@ -48,18 +48,21 @@ bool Nano::set_laser_range(uint8_t range)
     return data["ack"];
 }
 
+
+
 bool Nano::set_laser_resolution(bool resolution)
 {
     // send command to nano
-    clear_input();
-    write_json({
+    // clear_input();
+    int message_id = write_json({
         {"type", TYPE_SET},
         {"target", LASER_RESOLUTION},
         {"value", resolution}
     });
 
     // receive response
-    auto [status, data] = read_json(timeout);
+    auto [status, data] = try_receive_reply(message_id, 200000);
+    // auto [status, data] = read_json(timeout);
 
     if (!status)
         return false;
@@ -70,15 +73,15 @@ bool Nano::set_laser_resolution(bool resolution)
 bool Nano::set_laser_state(bool state)
 {
     // send command to nano
-    clear_input();
-    write_json({
+    // clear_input();
+    int message_id = write_json({
         {"type", TYPE_SET},
         {"target", LASER_STATE},
         {"value", state}
     });
 
     // receive response
-    auto [status, data] = read_json(timeout);
+    auto [status, data] = try_receive_reply(message_id, 200000);
 
     if (debugging)
         std::cout << status << "=status, checking \""<< data <<"\" for valid status" << std::endl;
@@ -94,16 +97,19 @@ bool Nano::set_laser_state(bool state)
 double Nano::laser_measure()
 {
     // send command to nano
-    clear_input();
-    write_json({
+    // clear_input();
+    int message_id = write_json({
         {"type", TYPE_LASER_MEASURE}
     });
 
     // receive response
-    auto [status, data] = read_json(timeout);
+    auto [status, data] = try_receive_reply(message_id, 2000000);
+
+    if (debugging)
+        std::cout << status << "=status, checking \""<< data <<"\" for status" << std::endl;
 
     if (!status)
-        return false;
+        return -1;
 
     // check for invalid data
     if (debugging)
@@ -127,15 +133,15 @@ double Nano::laser_measure()
 bool Nano::set_fan_speed(uint8_t speed)
 {
     // send command to nano
-    clear_input();
-    write_json({
+    // clear_input();
+    int message_id = write_json({
         {"type", TYPE_SET},
         {"target", FAN_SPEED},
         {"value", speed}
     });
 
     // receive response
-    auto [status, data] = read_json(timeout);
+    auto [status, data] = try_receive_reply(message_id, 200000);
 
     if (!status)
         return false;

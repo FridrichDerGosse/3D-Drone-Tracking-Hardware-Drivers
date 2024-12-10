@@ -232,7 +232,7 @@ int main()
             std::cout << std::fixed << std::setprecision(3) << distance << "m measured" << std::endl;
 
             // turn laser back on
-            my_nano.set_laser_state(1);
+            // my_nano.set_laser_state(1);
             break;
         }
 

@@ -8,6 +8,9 @@
  * 
  */
 #pragma once
+#include <list>
+#include <atomic>
+#include <thread>
 #include <termios.h>    // For POSIX terminal control definitions
 #include <iostream>
 #include <nlohmann/json.hpp>
@@ -27,10 +30,39 @@ namespace serial
         private:
             int port = -1;
             int baud_rate = -1;
+
             const char *device;
-        
+            const uint16_t receive_delay = 5000;
+
+            std::atomic_bool running{true};
+            std::atomic_uint32_t id_counter{0};
+
+            std::list<json> received_messages;
+            std::thread receive_thread;
+       
+        protected:
+            /**
+             * @brief Get the unique id objectget unique message
+             */
+            int get_unique_id();
+
+            /**
+             * @brief continually receive messages
+             */
+            void receive_messages();
+
+            /**
+             * @brief try to find a reply message
+             * 
+             * @param id original message id
+             * @return found, json (if found) 
+             */
+            std::pair<bool, json> try_get_reply(uint16_t id);
+
+            std::pair<bool, json> try_receive_reply(uint16_t id, int timeout);
+
         public:
-            bool debugging = false;
+            bool debugging = true;
 
             SimpleSerial(const char *device);
             ~SimpleSerial();
@@ -52,7 +84,12 @@ namespace serial
             /**
              * @brief if available, read all input
              */
-            void clear_input();
+            // void clear_input();
+
+            /**
+             * @brief flush all messages to serial
+             */
+            void flush();
 
             /**
              * @brief send a message to a serial device
@@ -95,6 +132,8 @@ namespace serial
     };
 
     int setup(const char *device, int baud);
+
+    void flush(int fd);
 
     int write_message(int port, const char *message);
 
