@@ -29,6 +29,11 @@ bool Nano::begin(int baud)
     return SimpleSerial::begin(baud);
 }
 
+bool Nano::active()
+{
+    return SimpleSerial::active();
+}
+
 bool Nano::set_laser_range(uint8_t range)
 {
     // send command to nano
@@ -48,8 +53,6 @@ bool Nano::set_laser_range(uint8_t range)
     return data["ack"];
 }
 
-
-
 bool Nano::set_laser_resolution(bool resolution)
 {
     // send command to nano
@@ -61,8 +64,7 @@ bool Nano::set_laser_resolution(bool resolution)
     });
 
     // receive response
-    auto [status, data] = try_receive_reply(message_id, 200000);
-    // auto [status, data] = read_json(timeout);
+    auto [status, data] = try_receive_reply(message_id, 200*MS);
 
     if (!status)
         return false;
@@ -93,7 +95,6 @@ bool Nano::set_laser_state(bool state)
     return data["ack"];
 }
 
-
 double Nano::laser_measure()
 {
     // send command to nano
@@ -103,7 +104,7 @@ double Nano::laser_measure()
     });
 
     // receive response
-    auto [status, data] = try_receive_reply(message_id, 2000000);
+    auto [status, data] = try_receive_reply(message_id, 2*S);
 
     if (debugging)
         std::cout << status << "=status, checking \""<< data <<"\" for status" << std::endl;

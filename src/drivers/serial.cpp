@@ -164,7 +164,6 @@ bool serial::read_message(int port, std::string &buffer, int timeout, bool debug
             std::cout << "\rno data available, timeout: " << current_timeout << std::endl;
 
         // No data available, wait and increment timeout
-        // usleep(delay_interval);
         current_timeout += delay_interval;
     }
 
@@ -202,13 +201,87 @@ void SimpleSerial::receive_messages()
             if (!ok)
                 continue;
 
+            // check if message is a control message
+            if (data.contains("ctrl"))
+            {
+                switch ((int)data["ctrl"])
+                {
+                    case 0:  // comm start
+                    {
+                        if (debugging)
+                            std::cout << "received comm start: " << std::endl;
+
+                        connection_active = true;
+                        break;
+                    }
+                    
+                    case 1: // ping request
+                    {
+                        if (debugging)
+                            std::cout << "received ping request" << std::endl;
+                        
+                        // send pong message
+                        write_json({
+                            {"type", 2},
+                            {"to", data["id"]}
+                        });
+
+                        break;
+                    }
+
+                    case 2:  // pong
+                    {
+                        if (debugging)
+                            std::cout << "received pong with id " << data["to"] << std::endl;
+
+                        // append to message buffer
+                        received_replies.push_back(data);
+
+                        break;
+                    }
+
+                    case 3:  // rf message forward
+                    {
+                        if (debugging)
+                            std::cout << "received RF message: " << data["data"].dump(4) << std::endl;
+                        
+                        // append data to network messages
+                        // differentiate between replies and normal messages
+                        if (data["data"].contains("to"))
+                        {
+                            if (debugging)
+                                std::cout << "appending as reply" << std::endl;
+
+                            received_network_replies.push_back(data["data"]);
+                        }
+                        else
+                        {
+                            if (debugging)
+                                std::cout << "appending as message" << std::endl;
+
+                            received_network_messages.push_back(data["data"]);
+                        }
+
+                        break;
+                    }
+
+                    default:
+                    {
+                        if (debugging)
+                            std::cout << "invalid control message: " << data.dump(4) << std::endl;
+
+                        break;
+                    }
+                }
+            }
+
             // check if message has an "reply to" key
-            if (data.contains("to"))
+            else if (data.contains("to"))
             {
                 if (debugging)
                     std::cout << "appending" << std::endl;
 
-                received_messages.push_back(data);
+                received_replies.push_back(data);
             }
             else
             {
@@ -226,19 +299,20 @@ void SimpleSerial::receive_messages()
         std::cout << "receive thread exit" << std::endl;
 }
 
-std::pair<bool, json> SimpleSerial::try_get_reply(uint16_t id)
+std::pair<bool, json> SimpleSerial::try_get_from_list(std::list<json> *list, uint16_t id)
 {
-    // if (debugging)
-    //     std::cout << "trying to find message with id: " << id << std::endl;
-
     // checks if a message with the correct reply id has been appended
-    for (json message : received_messages)
+    for (json message : *list)
     {
         if (message["to"] == id)
         {
             if (debugging)
                 std::cout << "found: " << message << std::endl;
 
+            // delete element from list
+            list->remove(message);
+
+            // return message
             return {true, message};
         }
     }
@@ -247,14 +321,32 @@ std::pair<bool, json> SimpleSerial::try_get_reply(uint16_t id)
     return {false, {{"ack", false}}};
 }
 
-std::pair<bool, json> SimpleSerial::try_receive_reply(uint16_t id, int timeout)
+std::pair<bool, json> SimpleSerial::try_get_reply(uint16_t id)
+{
+    return try_get_from_list(&received_replies, id);
+}
+
+std::pair<bool, json> SimpleSerial::try_get_netowrk_reply(uint16_t id)
+{
+    return try_get_from_list(&received_network_replies, id);
+}
+
+std::pair<bool, json> SimpleSerial::try_receive_reply(
+    uint16_t id,
+    int timeout,
+    bool type
+)
 {
     if (debugging)
         std::cout << "trying to receive message with id: " << id << std::endl;
     
     while (timeout > 0)
     {
-        auto [found, data] = try_get_reply(id);
+        // select list depending on type
+        auto [found, data] = try_get_from_list(
+            &(type ? received_network_replies : received_replies),
+            id
+        );
 
         // return message if received
         if (found)
@@ -327,6 +419,11 @@ bool SimpleSerial::available()
     return result > 0; // If result is greater than 0, data is available
 }
 
+bool SimpleSerial::active()
+{
+    return connection_active;
+}
+
 // void SimpleSerial::clear_input()
 // {
 //     std::string buff;
@@ -371,12 +468,41 @@ int SimpleSerial::write_json(json data)
     data["id"] = get_unique_id();
 
     if (debugging)
-        std::cout << "writing json: " << (data.dump() + '\0') << std::endl;
+        std::cout << "writing json: " << data.dump(4) << std::endl;
 
     // write data to serial
     write(data.dump() + '\0');
 
     // dump to json and add \0 as terminator
+    return data["id"];
+}
+
+int SimpleSerial::write_json_network(json data, int target_node)
+{
+    // tag network message with unique id
+    data["id"] = get_unique_id();
+
+    if (debugging)
+        std::cout << "encapsupating network message" << data.dump(4) << std::endl;
+
+    // encapsulate into nano message
+    json encapsulated_message;
+    encapsulated_message["type"] = 0;
+    encapsulated_message["target"] = target_node;
+    encapsulated_message["data"] = data;
+
+    // send message and wait for acknowledgement
+    int nano_id = write_json(encapsulated_message);
+    auto [ok, data] = try_receive_reply(nano_id, 100*MS);
+
+    // return fail if ack wasn't received or isn't successful
+    if (!ok)
+        return -1;
+
+    if (!data["ack"])
+        return -1;
+
+    // if succesfull, return network message id
     return data["id"];
 }
 

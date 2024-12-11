@@ -30,6 +30,11 @@ namespace nano
             bool begin(int baud);
 
             /**
+             * @brief checks if the connection with the nano is active (nano has send ctrl type 0 message)
+             */
+            bool active();
+
+            /**
              * @brief sensor range
              * 
              * @param range must be 5, 10, 30, 50 or 80

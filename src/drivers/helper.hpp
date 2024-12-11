@@ -8,7 +8,17 @@
  */
 #pragma once
 #include <gpiod.h>
+#include <unistd.h>
 
+// macros
+// constants
+#define MS 1000
+#define S  1000000
+
+#define sleep(T) usleep(T*S)
+#define msleep(T) usleep(T*MS)
+
+// types
 typedef short int int16_t;
 typedef unsigned short int uint16_t;
 typedef unsigned char uint8_t;

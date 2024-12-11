@@ -14,6 +14,7 @@
 #include <termios.h>    // For POSIX terminal control definitions
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include "helper.hpp"
 
 
 using json = nlohmann::json;
@@ -30,14 +31,17 @@ namespace serial
         private:
             int port = -1;
             int baud_rate = -1;
+            bool connection_active = false;
 
             const char *device;
-            const uint16_t receive_delay = 5000;
+            const uint16_t receive_delay = 5 * MS;
 
             std::atomic_bool running{true};
             std::atomic_uint32_t id_counter{0};
 
-            std::list<json> received_messages;
+            std::list<json> received_network_messages;
+            std::list<json> received_network_replies;
+            std::list<json> received_replies;
             std::thread receive_thread;
        
         protected:
@@ -51,6 +55,8 @@ namespace serial
              */
             void receive_messages();
 
+            std::pair<bool, json> try_get_from_list(std::list<json> *list, uint16_t id);
+
             /**
              * @brief try to find a reply message
              * 
@@ -59,7 +65,27 @@ namespace serial
              */
             std::pair<bool, json> try_get_reply(uint16_t id);
 
-            std::pair<bool, json> try_receive_reply(uint16_t id, int timeout);
+            /**
+             * @brief try to find a network reply message
+             * 
+             * @param id original message id
+             * @return found, json (if found) 
+             */
+            std::pair<bool, json> try_get_netowrk_reply(uint16_t id);
+
+            /**
+             * @brief tries to receive a reply from either nano or network
+             * 
+             * @param id id to find
+             * @param timeout max time to wait
+             * @param type 0: nano, 1: network
+             * @return found, json (if found)
+             */
+            std::pair<bool, json> try_receive_reply(
+                uint16_t id,
+                int timeout,
+                bool type=false
+            );
 
         public:
             bool debugging = true;
@@ -80,6 +106,11 @@ namespace serial
              * @brief checks if data is avaialable to read
              */
             bool available();
+
+            /**
+             * @brief checks if the connection with the nano is active (nano has send ctrl type 0 message)
+             */
+            bool active();
 
             /**
              * @brief if available, read all input
@@ -103,9 +134,18 @@ namespace serial
              * @brief send a json object over serial
              * 
              * @param data json object
-             * @return int message length (negative for fail)
+             * @return int message id (negative for fail)
              */
             int write_json(json data);
+
+            /**
+             * @brief send a json object over network
+             * 
+             * @param data json object
+             * @param target_node network target
+             * @return int message id (negative for fail)
+             */
+            int write_json_network(json data, int target_node);
 
             /**
              * @brief read message from serial device

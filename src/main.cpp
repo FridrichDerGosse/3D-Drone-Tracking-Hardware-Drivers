@@ -38,7 +38,7 @@ void alignment_countdown(std::atomic<bool>& finished_flag)
         std::cout << "\rtime left: " << std::setw(4) << std::setfill(' ') << std::left << std::fixed << std::setprecision(1) << (70.f - delta.count() / 1000000.f) << " seconds" << std::flush;
 
         // wait 100 ms
-        usleep(100000);
+        msleep(100);
     }
 
     // print total alignment time
@@ -102,10 +102,6 @@ int main()
         esd
     );
 
-    // turn laser off bevore alignment, also wait 2 seconds for nano to start
-    // usleep(2000000);
-    // my_nano.set_laser_state(0);
-
     // calibrate steppers
     std::cout << "calibrating turret ..." << std::endl;
 
@@ -142,6 +138,10 @@ int main()
     // make sure all steppers have moved
     if (tmp_thread.joinable())
         tmp_thread.join();
+
+    // wait for nano to start
+    std::cout << "waiting for nano ..." << std::endl;
+    while (!my_nano.active()) { msleep(50); };
 
     std::cout << "syntax: <direction (h,v for absolute): u,d,l,r> <ammount in °>" << std::endl;
     std::cout << "alternatively, input: " << std::endl;
