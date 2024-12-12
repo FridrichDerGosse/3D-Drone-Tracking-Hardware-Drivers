@@ -5,6 +5,7 @@
 #include <cstring>  // For strerror()
 
 #include "serial.hpp"
+#include "terminal.hpp"
 
 
 // chat-gpt function
@@ -62,7 +63,7 @@ void serial::configureSerialPort(int fd, int baudRate)
     // Get current configuration
     if (tcgetattr(fd, &tty) != 0)
     {
-        std::cerr << "Error getting terminal attributes: " << strerror(errno) << std::endl;
+        std::cerr << "Error getting terminal attributes: " << strerror(errno) << cc::endl;
         exit(EXIT_FAILURE);
     }
 
@@ -87,7 +88,7 @@ void serial::configureSerialPort(int fd, int baudRate)
     // Apply the configuration
     if (tcsetattr(fd, TCSANOW, &tty) != 0)
     {
-        std::cerr << "Error setting terminal attributes: " << strerror(errno) << std::endl;
+        std::cerr << "Error setting terminal attributes: " << strerror(errno) << cc::endl;
         exit(EXIT_FAILURE);
     }
 }
@@ -98,7 +99,7 @@ int serial::setup(const char *device, int baud)
     int serialPort = open(device, O_RDWR | O_NOCTTY | O_SYNC);
     if (serialPort < 0)
     {
-        std::cerr << "Error opening serial port: " << strerror(errno) << std::endl;
+        std::cerr << "Error opening serial port: " << strerror(errno) << cc::endl;
         return -1;
     }
 
@@ -112,7 +113,7 @@ void serial::flush(int fd)
     // Clear input and output buffers
     if (tcflush(fd, TCIOFLUSH) != 0)
     {
-        std::cerr << "Error flushing serial port: " << strerror(errno) << std::endl;
+        std::cerr << "Error flushing serial port: " << strerror(errno) << cc::endl;
     }
 }
 
@@ -121,7 +122,7 @@ int serial::write_message(int port, const char *message)
     ssize_t bytesWritten = write(port, message, strlen(message));
     if (bytesWritten < 0)
     {
-        std::cerr << "Error writing to serial port: " << strerror(errno) << std::endl;
+        std::cerr << "Error writing to serial port: " << strerror(errno) << cc::endl;
         close(port);
         return -1;
     }
@@ -135,7 +136,7 @@ bool serial::read_message(int port, std::string &buffer, int timeout, bool debug
     const unsigned int delay_interval = 5; // 5 ms delay between checks
 
     if (debugging)
-        std::cout << "waiting to receive data" << std::endl;
+        std::cout << FG_COLOR(250) << "waiting to receive data" << cc::endl;
 
     while (current_timeout < timeout)
     {
@@ -146,7 +147,7 @@ bool serial::read_message(int port, std::string &buffer, int timeout, bool debug
         if (bytes_read > 0)
         {
             if (debugging)
-                std::cout << "received: \"" << tmp << "\"" << std::endl;
+                std::cout << FG_COLOR(22) << "received" << FG_COLOR(240) << ": \"" << tmp << "\"" << cc::endl;
 
             current_timeout = 0;
 
@@ -161,11 +162,14 @@ bool serial::read_message(int port, std::string &buffer, int timeout, bool debug
         }
 
         if (debugging)
-            std::cout << "\rno data available, timeout: " << current_timeout << std::endl;
+            std::cout << FG_COLOR(250) << "\rno data available, timeout: " << current_timeout << cc::endl;
 
         // No data available, wait and increment timeout
         current_timeout += delay_interval;
     }
+
+    if (debugging && current_timeout >= timeout)
+        std::cout << FG_COLOR(52) << "\rtimeout" << cc::endl;
 
     return !buffer.empty(); // Return true if any data was read
 }
@@ -175,7 +179,6 @@ int serial::close_port(int port)
     return close(port);
 }
 
-
 int SimpleSerial::get_unique_id()
 {
     return id_counter.fetch_add(1);
@@ -184,19 +187,23 @@ int SimpleSerial::get_unique_id()
 void SimpleSerial::receive_messages()
 {
     if (debugging)
-        std::cout << "receive thread started" << std::endl;
+        std::cout << FG_COLOR(250) << "receive thread started" << cc::endl;
     
     while (running)
     {
         if (available())
         {
             if (debugging)
-                std::cout << "message available" << std::endl;
+                std::cout << FG_COLOR(250) << "message available" << cc::endl;
 
             auto [ok, data] = read_json();
 
             if (debugging)
-                std::cout << "received (ok=" << ok << "): \"" << data << "\"" << std::endl;
+            {
+                std::cout << FG_COLOR(250) << "received (";
+                std::cout << (ok ? cc::fg::GREEN : cc::fg::RED) << (ok ? "OK" : "FAIL");
+                std::cout << FG_COLOR(250) << "): \"" << data << "\"" << cc::endl;
+            }
 
             if (!ok)
                 continue;
@@ -209,7 +216,7 @@ void SimpleSerial::receive_messages()
                     case 0:  // comm start
                     {
                         if (debugging)
-                            std::cout << "received comm start: " << std::endl;
+                            std::cout << FG_COLOR(250) << "received comm start" << cc::endl;
 
                         connection_active = true;
                         break;
@@ -218,7 +225,7 @@ void SimpleSerial::receive_messages()
                     case 1: // ping request
                     {
                         if (debugging)
-                            std::cout << "received ping request" << std::endl;
+                            std::cout << FG_COLOR(250) << "received ping request" << cc::endl;
                         
                         // send pong message
                         write_json({
@@ -232,7 +239,7 @@ void SimpleSerial::receive_messages()
                     case 2:  // pong
                     {
                         if (debugging)
-                            std::cout << "received pong with id " << data["to"] << std::endl;
+                            std::cout << FG_COLOR(250) << "received pong with id " << FG_COLOR(240) << data["to"] << cc::endl;
 
                         // append to message buffer
                         received_replies.push_back(data);
@@ -242,22 +249,22 @@ void SimpleSerial::receive_messages()
 
                     case 3:  // rf message forward
                     {
-                        if (debugging)
-                            std::cout << "received RF message: " << data["data"].dump(4) << std::endl;
+                        if (net_debugging)
+                            std::cout << cc::fg::BLUE << "received RF message: " << FG_COLOR(245) << data["data"].dump(4) << cc::endl;
                         
                         // append data to network messages
                         // differentiate between replies and normal messages
                         if (data["data"].contains("to"))
                         {
-                            if (debugging)
-                                std::cout << "appending as reply" << std::endl;
+                            if (net_debugging)
+                                std::cout << FG_COLOR(250) << "appending as reply" << cc::endl;
 
                             received_network_replies.push_back(data["data"]);
                         }
                         else
                         {
-                            if (debugging)
-                                std::cout << "appending as message" << std::endl;
+                            if (net_debugging)
+                                std::cout << FG_COLOR(250) << "appending as message" << cc::endl;
 
                             received_network_messages.push_back(data["data"]);
                         }
@@ -265,10 +272,18 @@ void SimpleSerial::receive_messages()
                         break;
                     }
 
+                    case 4:  // nano debugging message
+                    {
+                        // save as string so no extra > " < are added
+                        std::string content = data["content"];
+                        std::cout << cc::fg::CYAN << "nano debug>> " << cc::ctrl::ENDC << content << cc::endl;
+                        break;
+                    }
+
                     default:
                     {
                         if (debugging)
-                            std::cout << "invalid control message: " << data.dump(4) << std::endl;
+                            std::cout << cc::fg::YELLOW << "invalid control message: " << data.dump(4) << cc::endl;
 
                         break;
                     }
@@ -279,14 +294,14 @@ void SimpleSerial::receive_messages()
             else if (data.contains("to"))
             {
                 if (debugging)
-                    std::cout << "appending" << std::endl;
+                    std::cout << "appending" << cc::endl;
 
                 received_replies.push_back(data);
             }
             else
             {
                 if (debugging)
-                    std::cout << "doesn't contain \"to\" key" << std::endl;
+                    std::cout << "doesn't contain \"to\" key" << cc::endl;
             }
 
             continue;
@@ -296,7 +311,7 @@ void SimpleSerial::receive_messages()
     }
 
     if (debugging)
-        std::cout << "receive thread exit" << std::endl;
+        std::cout << "receive thread exit" << cc::endl;
 }
 
 std::pair<bool, json> SimpleSerial::try_get_from_list(std::list<json> *list, uint16_t id)
@@ -307,7 +322,7 @@ std::pair<bool, json> SimpleSerial::try_get_from_list(std::list<json> *list, uin
         if (message["to"] == id)
         {
             if (debugging)
-                std::cout << "found: " << message << std::endl;
+                std::cout << FG_COLOR(22) << "found: " << FG_COLOR(250) << message << cc::endl;
 
             // delete element from list
             list->remove(message);
@@ -338,7 +353,7 @@ std::pair<bool, json> SimpleSerial::try_receive_reply(
 )
 {
     if (debugging)
-        std::cout << "trying to receive message with id: " << id << std::endl;
+        std::cout << FG_COLOR(250) << "trying to receive message with id: " << cc::fg::MAGENTA << id << cc::endl;
     
     while (timeout > 0)
     {
@@ -355,6 +370,9 @@ std::pair<bool, json> SimpleSerial::try_receive_reply(
         usleep(receive_delay);
         timeout -= receive_delay;
     }
+
+    if (debugging)
+        std::cout << FG_COLOR(52) << "failed to receive message (id=" << cc::fg::MAGENTA << id << ")" << cc::endl;
 
     // return dummy false reply
     return {false, {{"type", 0}, {"ack", 0}, {"valid", 0}}};
@@ -389,7 +407,7 @@ bool SimpleSerial::begin(int baud)
 
     if (actual_baud < 0)
     {
-        std::cerr << "Unsupported baud rate: " << baud << std::endl;
+        std::cerr << "Unsupported baud rate: " << baud << cc::endl;
         return false;
     }
 
@@ -429,7 +447,7 @@ bool SimpleSerial::active()
 //     std::string buff;
 
 //     if (debugging)
-//         std::cout << "clearing input ..." << std::endl;
+//         std::cout << "clearing input ..." << cc::endl;
 
 //     // read while available
 //     while (available())
@@ -437,16 +455,16 @@ bool SimpleSerial::active()
 //         read(buff, 100);
 
 //         if (debugging && buff.length() > 0)
-//             std::cout << "cleaning read: " << buff << std::endl;
+//             std::cout << "cleaning read: " << buff << cc::endl;
 //     }
 //     if (!available() && debugging)
-//         std::cout << "clearing: nothing available" << std::endl;
+//         std::cout << "clearing: nothing available" << cc::endl;
 // }
 
 void SimpleSerial::flush()
 {
     if (debugging)
-        std::cout << "flushing ..." << std::endl;
+        std::cout << FG_COLOR(117) << "flushing ..." << cc::endl;
 
     serial::flush(port);
 }
@@ -468,7 +486,7 @@ int SimpleSerial::write_json(json data)
     data["id"] = get_unique_id();
 
     if (debugging)
-        std::cout << "writing json: " << data.dump(4) << std::endl;
+        std::cout << FG_COLOR(250) << "writing json: " << FG_COLOR(240) << data.dump(4) << cc::endl;
 
     // write data to serial
     write(data.dump() + '\0');
@@ -483,7 +501,7 @@ int SimpleSerial::write_json_network(json data, int target_node)
     data["id"] = get_unique_id();
 
     if (debugging)
-        std::cout << "encapsupating network message" << data.dump(4) << std::endl;
+        std::cout << FG_COLOR(250) << "encapsupating network message" << FG_COLOR(240) << data.dump(4) << cc::endl;
 
     // encapsulate into nano message
     json encapsulated_message;
@@ -493,13 +511,13 @@ int SimpleSerial::write_json_network(json data, int target_node)
 
     // send message and wait for acknowledgement
     int nano_id = write_json(encapsulated_message);
-    auto [ok, data] = try_receive_reply(nano_id, 100*MS);
+    auto [ok, reply_data] = try_receive_reply(nano_id, 100*MS);
 
     // return fail if ack wasn't received or isn't successful
     if (!ok)
         return -1;
 
-    if (!data["ack"])
+    if (!reply_data["ack"])
         return -1;
 
     // if succesfull, return network message id
@@ -519,19 +537,19 @@ std::pair<bool, json> SimpleSerial::read_json(int timeout)
         // return false;
 
     if (debugging)
-        std::cout << "waiting to receive" << std::endl;
+        std::cout << FG_COLOR(250) << "waiting to receive" << cc::endl;
 
     read(read_buff);
 
     if (read_buff.length() < 2)
     {
         if (debugging)
-            std::cout << "invalid receive: \"" << read_buff << "\"" << std::endl;
+            std::cout << cc::fg::RED << "invalid receive: " << FG_COLOR(240) << read_buff << cc::endl;
         
         if (!available())
         {
             if (debugging)
-                std::cout << "new message available, retrying" << std::endl;
+                std::cout << FG_COLOR(250) << "new message available, retrying" << cc::endl;
 
             return read_json(timeout);
         }
@@ -547,11 +565,11 @@ std::pair<bool, json> SimpleSerial::read_json(int timeout)
 
     if (debugging)
     {
-        std::cout << "converting \"" << read_buff << "\" to json: ";
+        std::cout << FG_COLOR(250) << "converting " << FG_COLOR(240) << read_buff << FG_COLOR(250) << " to json: " << FG_COLOR(240);
         for (unsigned char c : read_buff) {
             std::cout << "\\x" << std::hex << (int)c;
         }
-        std::cout << std::endl;
+        std::cout << cc::endl;
 
         std::string sanitized = "{\"type\":2,\"valid\":false}";
     }
@@ -563,7 +581,7 @@ std::pair<bool, json> SimpleSerial::read_json(int timeout)
     }
     catch (const json::exception& e)
     {
-        std::cerr << "JSON error: " << e.what() << std::endl;
+        std::cerr << "JSON error: " << e.what() << cc::endl;
         return {false, {{"type", 0}, {"ack", 0}, {"valid", 0}}};
     }
 }

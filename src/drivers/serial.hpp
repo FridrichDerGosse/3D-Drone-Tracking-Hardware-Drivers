@@ -88,7 +88,8 @@ namespace serial
             );
 
         public:
-            bool debugging = true;
+            bool net_debugging = false;
+            bool debugging = false;
 
             SimpleSerial(const char *device);
             ~SimpleSerial();

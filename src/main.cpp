@@ -46,7 +46,7 @@ void alignment_countdown(std::atomic<bool>& finished_flag)
 }
 
 
-// TODO: Messages are still delayed once (don't ask me how)
+// TODO: temp readout with fan curve (/etc/armbianmonitor/datasources/soctemp)
 
 
 int main()
@@ -102,42 +102,45 @@ int main()
         esd
     );
 
-    // calibrate steppers
-    std::cout << "calibrating turret ..." << std::endl;
+    all_off(horizontal_stepper, vstepper);
+    all_shut(horizontal_stepper, vstepper);
 
-    // countdown thread
-    std::atomic<bool> alignment_flag(false);
-    std::thread clock_thread(alignment_countdown, std::ref(alignment_flag));
+    // // calibrate steppers
+    // std::cout << "calibrating turret ..." << std::endl;
 
-    // horizontal stepper alignment
-    std::thread tmp_thread(&stepper::Horizontal::calibrate, &horizontal_stepper);
+    // // countdown thread
+    // std::atomic<bool> alignment_flag(false);
+    // std::thread clock_thread(alignment_countdown, std::ref(alignment_flag));
 
-    // wait two seconds for vertical to start
-    vstepper.calibrate();
+    // // horizontal stepper alignment
+    // std::thread tmp_thread(&stepper::Horizontal::calibrate, &horizontal_stepper);
 
-    // make sure all steppers are aligend
-    if (tmp_thread.joinable())
-        tmp_thread.join();
+    // // wait two seconds for vertical to start
+    // vstepper.calibrate();
 
-    // finish clock thread
-    alignment_flag = true;
-    if (clock_thread.joinable())
-        clock_thread.join();
+    // // make sure all steppers are aligend
+    // if (tmp_thread.joinable())
+    //     tmp_thread.join();
 
-    std::cout << "homing turret ..." << std::endl;
+    // // finish clock thread
+    // alignment_flag = true;
+    // if (clock_thread.joinable())
+    //     clock_thread.join();
 
-    // set speeds
-    horizontal_stepper.set_speed(230);
-    vstepper.set_speed(200);
+    // std::cout << "homing turret ..." << std::endl;
 
-    // home turret
-    // set steppers to 0
-    tmp_thread = std::thread(&stepper::Vertical::move_absolute_angle, &vstepper, 0);
-    horizontal_stepper.move_absolute_angle(0);
+    // // set speeds
+    // horizontal_stepper.set_speed(230);
+    // vstepper.set_speed(200);
 
-    // make sure all steppers have moved
-    if (tmp_thread.joinable())
-        tmp_thread.join();
+    // // home turret
+    // // set steppers to 0
+    // tmp_thread = std::thread(&stepper::Vertical::move_absolute_angle, &vstepper, 0);
+    // horizontal_stepper.move_absolute_angle(0);
+
+    // // make sure all steppers have moved
+    // if (tmp_thread.joinable())
+    //     tmp_thread.join();
 
     // wait for nano to start
     std::cout << "waiting for nano ..." << std::endl;

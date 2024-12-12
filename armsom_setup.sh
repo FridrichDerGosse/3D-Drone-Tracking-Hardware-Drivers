@@ -1,4 +1,6 @@
+#! /usr/bin/bash
 # --> flash debian to armsom SD card
+
 function update_system
 {
     # update system
@@ -8,7 +10,7 @@ function update_system
 function setup_camera
 {
     sudo apt update
-    sudo apt install v4l-utils
+    sudo apt install v4l-utils -y
 
     # download camera driver package and install
     cd Downloads
