@@ -1,25 +1,26 @@
 # the default env configuration that is used when not
+# manual compile: g++ -std=c++17 -Iinclude -lgpiod -o run/main $(find src -name '*.cpp')
 # specified in env.mk
 CARG = 
 LARG = 
 USER = armsom
-HOST = armsom-sige7.local
+HOST = 192.168.68.53
+# HOST = 10.42.0.48
 LCORES =-j8
-RCORES =-j4
+RCORES =-j7
 
 # project structure
 SRC_DIR = src	
 INCLUDE_DIR = include
 DEV_INCLUDE = devinclude
 OBJ_DIR = obj
-RUN_DIR = run
 MOUNT_FOLDER = mount
 WORKSPACE_NAME = $(shell basename ${PWD})
 
 # C++ configurations
 CC = aarch64-linux-gnu-g++
 CFLAGS = -g $(ADDINC) -I$(INCLUDE_DIR) -I$(SRC_DIR) $(CARG) -std=c++20
-LIBS = -lpthread -lgpiod $(LARG)
+LIBS = -lpthread -lgpiod $(LARG) -I$(INCLUDE_DIR)
 
 # files and compliation results
 SRC_SOURCES = $(shell find $(SRC_DIR) -name '*.cpp')
@@ -30,26 +31,47 @@ INCLUDE_SOURCES = $(shell find $(INCLUDE_DIR) -name '*.cpp')
 INCLUDE_OBJECTS_TEMP = $(patsubst %.cpp,%.o,$(INCLUDE_SOURCES))
 INCLUDE_OBJECTS = $(patsubst $(INCLUDE_DIR)/%,$(OBJ_DIR)/include/%,$(INCLUDE_OBJECTS_TEMP))
 
+CXX := g++
+CXXFLAGS := -std=c++17 -Iinclude
+# LDFLAGS := -L/usr/local/lib -lgpiod  # for non-standard path
+LDFLAGS := -lgpiod
+SRC_DIR := src
+OBJ_DIR := obj
+
+SOURCES := $(shell find $(SRC_DIR) -name '*.cpp')
+OBJECTS := $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(SOURCES))
+
+RUN_DIR = run
 EXECUTABLE = $(RUN_DIR)/main
 
 REMOTE_OBJECTS = $(shell find $(OBJ_DIR) -name '*.o')
 
 ## == Compilation
 
-# create executable file from all object files
-$(EXECUTABLE): $(SRC_OBJECTS) $(INCLUDE_OBJECTS)
+# # create executable file from all object files
+# $(EXECUTABLE): $(SRC_OBJECTS) $(INCLUDE_OBJECTS)
+# 	mkdir -p $(RUN_DIR)
+# 	$(CC) $(SRC_OBJECTS) $(INCLUDE_OBJECTS) -o $@ $(LIBS)
+
+# # create object file for every source file in source
+# $(OBJ_DIR)/src/%.o: $(SRC_DIR)/%.cpp
+# 	mkdir -p $(dir $@)
+# 	$(CC) $(CFLAGS) -c $< -o $@
+
+# # create object file for every source file in include
+# $(OBJ_DIR)/include/%.o: $(INCLUDE_DIR)/%.cpp
+# 	mkdir -p $(dir $@)
+# 	$(CC) $(CFLAGS) -c $< -o $@
+
+all: $(EXECUTABLE)
+
+$(EXECUTABLE): $(OBJECTS)
 	mkdir -p $(RUN_DIR)
-	$(CC) $(SRC_OBJECTS) $(INCLUDE_OBJECTS) -o $@ $(LIBS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
-# create object file for every source file in source
-$(OBJ_DIR)/src/%.o: $(SRC_DIR)/%.cpp
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
-
-# create object file for every source file in include
-$(OBJ_DIR)/include/%.o: $(INCLUDE_DIR)/%.cpp
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 # links pre-copied objects on the remote target (hybrid link)
 hlink: $(REMOTE_OBJECTS)
@@ -66,7 +88,8 @@ local_compile: $(SRC_OBJECTS) $(INCLUDE_OBJECTS)
 remote_start: 
 	ssh -t $(USER)@$(HOST) "cd projects/$(WORKSPACE_NAME); sudo $(RUN_DIR)/main"
 
-# envoke build on remote target
+# envoke build on remote target ## 
+#	ssh $(USER)@$(HOST) "bash -c \"cd projects/$(WORKSPACE_NAME) && g++ -std=c++17 -Iinclude -lgpiod -o run/main $(find src -name '*.cpp')\""
 remote_build:
 	ssh $(USER)@$(HOST) "bash -c \"cd projects/$(WORKSPACE_NAME) && make $(RCORES)\""
 
@@ -136,3 +159,5 @@ unmount:
 # remove all subfolders and files of the object dir and the executable
 clean:
 	rm -rf $(EXECUTABLE) $(OBJ_DIR)/*
+
+.PHONY: all clean

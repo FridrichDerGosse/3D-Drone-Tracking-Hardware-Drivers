@@ -3,9 +3,8 @@
         {
             "name": "Linux",
             "includePath": [
-//                "${workspaceFolder}/include",
-//                "${workspaceFolder}/devinclude",
-                "${workspaceFolder}/src"
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/include"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/aarch64-linux-gnu-g++",

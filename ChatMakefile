@@ -1,0 +1,24 @@
+CXX := g++
+CXXFLAGS := -std=c++17 -Iinclude
+# LDFLAGS := -L/usr/local/lib -lgpiod  # for non-standard path
+LDFLAGS := -lgpiod
+SRC_DIR := src
+OBJ_DIR := obj
+TARGET := my_program
+
+SOURCES := $(shell find $(SRC_DIR) -name '*.cpp')
+OBJECTS := $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(SOURCES))
+
+all: $(TARGET)
+
+$(TARGET): $(OBJECTS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
+	mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+clean:
+	rm -rf $(OBJ_DIR) $(TARGET)
+
+.PHONY: all clean
