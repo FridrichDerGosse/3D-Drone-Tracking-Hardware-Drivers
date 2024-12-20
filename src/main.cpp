@@ -51,6 +51,7 @@ void alignment_countdown(std::atomic<bool>& finished_flag)
 
 int main()
 {
+    // --------------------------------------------------   HARDWARE SETUP   --------------------------------------------------
     // serial setup
     nano::Nano my_nano("/dev/ttyUSB0");
     my_nano.begin(9600);
@@ -102,6 +103,7 @@ int main()
         esd
     );
 
+    // -------------------------------------------------   TURRET ALIGNMENT   -------------------------------------------------
     all_off(horizontal_stepper, vstepper);
     all_shut(horizontal_stepper, vstepper);
 
@@ -142,10 +144,12 @@ int main()
     // if (tmp_thread.joinable())
     //     tmp_thread.join();
 
-    // wait for nano to start
+    // -------------------------------------------------   NANO COMM START   --------------------------------------------------
     std::cout << "waiting for nano ..." << std::endl;
     while (!my_nano.active()) { msleep(50); };
+    std::cout << "nano ready" << std::endl;
 
+    // ----------------------------------------------   POSITIONAL CALIBRATION   ----------------------------------------------
     std::cout << "syntax: <direction (h,v for absolute): u,d,l,r> <ammount in °>" << std::endl;
     std::cout << "alternatively, input: " << std::endl;
     std::cout << "\t* \"m\": measure" << std::endl;
@@ -270,7 +274,11 @@ int main()
         }
         std::cin.clear();
     }
+    // ------------------------------------------------   DATA SERVER START   -------------------------------------------------
 
+    // -------------------------------------------------   CAMERA TRACKING   --------------------------------------------------
+
+    // ------------------------------------------------   HARDWARE SHUTDOWN   -------------------------------------------------
     all_off(horizontal_stepper, vstepper);
     all_shut(horizontal_stepper, vstepper);
 

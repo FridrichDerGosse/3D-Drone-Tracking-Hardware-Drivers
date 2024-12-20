@@ -187,7 +187,7 @@ int SimpleSerial::get_unique_id()
 void SimpleSerial::receive_messages()
 {
     if (debugging)
-        std::cout << FG_COLOR(250) << "receive thread started" << cc::endl;
+        std::cout << cc::bfg::CYAN << "receive thread started" << cc::endl;
     
     while (running)
     {
