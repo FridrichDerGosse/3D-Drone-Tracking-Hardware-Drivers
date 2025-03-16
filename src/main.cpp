@@ -1,79 +1,286 @@
+/**
+ * @file main.cpp
+ * @author Nilusink
+ * @brief manual alignment
+ * @date 2024-12-04
+ * 
+ * @copyright Copyright Nilusink (c) 2024
+ * 
+ */
 #include <iostream>
 #include <gpiod.h>
 #include <unistd.h>
+#include <thread>
+#include <chrono>
+#include <atomic>
+#include <memory>
 
 #include "drivers/stepper.hpp"
+#include "drivers/nano.hpp"
+#include "pinout.hpp"
 
 
-#define CHIP_NAME "gpiochip3"
-#define LINE_NUMBER B+3
+void alignment_countdown(std::atomic<bool>& finished_flag)
+{
+    // set starting time
+    auto start = std::chrono::high_resolution_clock::now();
+
+    
+    // wait for finished flag to be set
+    std::chrono::microseconds delta;
+    std::chrono::_V2::system_clock::time_point now;
+    while (!finished_flag)
+    {
+        now = std::chrono::high_resolution_clock::now();
+        delta = std::chrono::duration_cast<std::chrono::microseconds>(now - start);
+
+        // count down from 70 (1 minute and 10 seconds)
+        std::cout << "\rtime left: " << std::setw(4) << std::setfill(' ') << std::left << std::fixed << std::setprecision(1) << (70.f - delta.count() / 1000000.f) << " seconds" << std::flush;
+
+        // wait 100 ms
+        msleep(100);
+    }
+
+    // print total alignment time
+    std::cout << "\rAlignment took " << std::fixed << std::setprecision(2) << (delta.count() / 1000000.f) << " seconds" << std::endl;
+}
+
+
+// TODO: temp readout with fan curve (/etc/armbianmonitor/datasources/soctemp)
+
 
 int main()
 {
-    gpiod_chip* chip_3 = gpiod_chip_open_by_name(CHIP_NAME);
-    if (!chip_3)
+    // --------------------------------------------------   HARDWARE SETUP   --------------------------------------------------
+    // serial setup
+    nano::Nano my_nano("/dev/ttyUSB0");
+    my_nano.begin(9600);
+
+    // setup chips and pins
+    auto gpio0 = get_chip("gpiochip0");
+    // auto gpio1 = get_chip("gpiochip1");
+    auto yaw_chip = get_chip(YAW_CHIP);
+    auto pitch_chip = get_chip(PITCH_CHIP);
+
+    // initialize stepper pins
+    // input order: 1, 4, 3, 2 (cheap chinese steppers ...)
+    auto yaw_a = get_pin(yaw_chip, YAW_IN1, false, false);  // in 1
+    auto yaw_b = get_pin(yaw_chip, YAW_IN4, false, false);  // in 4
+    auto yaw_c = get_pin(yaw_chip, YAW_IN3, false, false);  // in 3
+    auto yaw_d = get_pin(yaw_chip, YAW_IN2, false, false);  // in 2
+
+    auto pitch_left_a = get_pin(pitch_chip, PITCH_LEFT_IN1, false, false);  // in 1
+    auto pitch_left_b = get_pin(pitch_chip, PITCH_LEFT_IN4, false, false);  // in 4
+    auto pitch_left_c = get_pin(pitch_chip, PITCH_LEFT_IN3, false, false);  // in 3
+    auto pitch_left_d = get_pin(pitch_chip, PITCH_LEFT_IN2, false, false);  // in 2
+
+    auto pitch_right_a = get_pin(pitch_chip, PITCH_RIGHT_IN1, false, false);  // in 1
+    auto pitch_right_b = get_pin(pitch_chip, PITCH_RIGHT_IN4, false, false);  // in 4
+    auto pitch_right_c = get_pin(pitch_chip, PITCH_RIGHT_IN3, false, false);  // in 3
+    auto pitch_right_d = get_pin(pitch_chip, PITCH_RIGHT_IN2, false, false);  // in 2
+
+    // initialize end switch pins
+    auto eslr = get_pin(gpio0, END_SWITCH_LR, true);
+
+    auto esu = get_pin(pitch_chip, END_SWITCH_UP, true);
+    auto esd = get_pin(pitch_chip, END_SWITCH_DOWN, true);
+
+    // create pin groups
+    stepper::stepper_pinout_t horizontal_pins = {yaw_a, yaw_b, yaw_c, yaw_d};
+    stepper::stepper_pinout_t vertical_left_pins = {pitch_left_a, pitch_left_b, pitch_left_c, pitch_left_d};
+    stepper::stepper_pinout_t vertical_right_pins = {pitch_right_a, pitch_right_b, pitch_right_c, pitch_right_d};
+
+    // initialize stepper drivers
+    stepper::Horizontal horizontal_stepper(
+        horizontal_pins,
+        eslr
+    );
+
+    stepper::Vertical vstepper(
+        vertical_left_pins,
+        vertical_right_pins,
+        esu,
+        esd
+    );
+
+    // -------------------------------------------------   TURRET ALIGNMENT   -------------------------------------------------
+    all_off(horizontal_stepper, vstepper);
+    all_shut(horizontal_stepper, vstepper);
+
+    // // calibrate steppers
+    // std::cout << "calibrating turret ..." << std::endl;
+
+    // // countdown thread
+    // std::atomic<bool> alignment_flag(false);
+    // std::thread clock_thread(alignment_countdown, std::ref(alignment_flag));
+
+    // // horizontal stepper alignment
+    // std::thread tmp_thread(&stepper::Horizontal::calibrate, &horizontal_stepper);
+
+    // // wait two seconds for vertical to start
+    // vstepper.calibrate();
+
+    // // make sure all steppers are aligend
+    // if (tmp_thread.joinable())
+    //     tmp_thread.join();
+
+    // // finish clock thread
+    // alignment_flag = true;
+    // if (clock_thread.joinable())
+    //     clock_thread.join();
+
+    // std::cout << "homing turret ..." << std::endl;
+
+    // // set speeds
+    // horizontal_stepper.set_speed(230);
+    // vstepper.set_speed(200);
+
+    // // home turret
+    // // set steppers to 0
+    // tmp_thread = std::thread(&stepper::Vertical::move_absolute_angle, &vstepper, 0);
+    // horizontal_stepper.move_absolute_angle(0);
+
+    // // make sure all steppers have moved
+    // if (tmp_thread.joinable())
+    //     tmp_thread.join();
+
+    // -------------------------------------------------   NANO COMM START   --------------------------------------------------
+    std::cout << "waiting for nano ..." << std::endl;
+    while (!my_nano.active()) { msleep(50); };
+    std::cout << "nano ready" << std::endl;
+
+    // ----------------------------------------------   POSITIONAL CALIBRATION   ----------------------------------------------
+    std::cout << "syntax: <direction (h,v for absolute): u,d,l,r> <ammount in °>" << std::endl;
+    std::cout << "alternatively, input: " << std::endl;
+    std::cout << "\t* \"m\": measure" << std::endl;
+    std::cout << "\t* \"c\": confirm" << std::endl;
+    std::cout << "\t* \"e\": exit" << std::endl;
+    std::cout << "\t* \"f\": fan speed (0 to 255)" << std::endl;
+    std::cout << "\t* \"t\": TOF laser on/off (1/0)" << std::endl;
+
+    char direction;
+    double degrees;
+    bool running = true;
+    while (running)
     {
-        std::cerr << "Failed to open chip" << std::endl;
-        return -1;
+        std::cout << ">> ";
+        std::cin >> direction >> degrees;
+
+        switch (direction)
+        {
+        case 'u':
+            std::cout << "moving \"" << direction << "\" by " << degrees << "°" << std::endl;
+            vstepper.move_relative_angle(degrees);
+            break;
+
+        case 'd':
+            std::cout << "moving \"" << direction << "\" by " << degrees << "°" << std::endl;
+            vstepper.move_relative_angle(-degrees);
+            break;
+
+        case 'l':
+            std::cout << "moving \"" << direction << "\" by " << degrees << "°" << std::endl;
+            horizontal_stepper.move_relative_angle(-degrees);
+            break;
+
+        case 'r':
+            std::cout << "moving \"" << direction << "\" by " << degrees << "°" << std::endl;
+            horizontal_stepper.move_relative_angle(degrees);
+            break;
+
+        case 'h':
+            std::cout << "moving \"" << direction << "\" by " << degrees << "°" << std::endl;
+            horizontal_stepper.move_absolute_angle(degrees);
+            break;
+
+        case 'v':
+            std::cout << "moving \"" << direction << "\" by " << degrees << "°" << std::endl;
+            vstepper.move_absolute_angle(degrees);
+            break;
+
+        case 'c':
+        {
+            std::cout << "measuring ..." << std::endl;
+
+            // request laser measurement
+            double distance = my_nano.laser_measure();
+
+            if (distance < 0)
+            {
+                std::cout << "tof measurement failure" << std::endl;
+                break;
+            }
+
+            std::cout << "position: ";
+            std::cout << std::fixed << std::setprecision(3) << vstepper.get_current_angle() << "°v, ";
+            std::cout << std::fixed << std::setprecision(3) << horizontal_stepper.get_current_angle() << "°h at ";
+            std::cout << std::fixed << std::setprecision(3) << distance << "m locked" << std::endl;
+            std::cout << "exiting" << std::endl;
+            running = false;
+            break;
+        }
+
+        case 'm':
+        {
+            std::cout << "measuring ..." << std::endl;
+
+            // request laser measurement
+            double distance = my_nano.laser_measure();
+
+            if (distance < 0)
+            {
+                std::cout << "tof measurement failure" << std::endl;
+                break;
+            }
+
+            std::cout << "position: ";
+            std::cout << std::fixed << std::setprecision(3) << vstepper.get_current_angle() << "°v, ";
+            std::cout << std::fixed << std::setprecision(3) << horizontal_stepper.get_current_angle() << "°h at ";
+            std::cout << std::fixed << std::setprecision(3) << distance << "m measured" << std::endl;
+
+            // turn laser back on
+            // my_nano.set_laser_state(1);
+            break;
+        }
+
+        case 'f':
+        {
+            uint8_t fan_speed = degrees;
+            std::cout << "Setting fan to: " << (int)fan_speed << std::endl;
+
+            // set fan speed and wait for answer
+            my_nano.set_fan_speed(fan_speed);
+            std::cout << "done" << std::endl;
+
+            break;
+        }
+
+        case 't':
+        {
+            bool state = direction == 0;
+            std::cout << "Setting TOF laser to: " << (state ? "on" : "off") << std::endl;
+            std::cout << "Setting " << (my_nano.set_laser_state(state) ? "success": "fail") << std::endl;
+            break;
+        }
+
+        case 'e':
+            std::cout << "exiting" << std::endl;
+            running = false;
+            break;
+
+        default:
+            std::cout << "invalid" << std::endl;
+            break;
+        }
+        std::cin.clear();
     }
+    // ------------------------------------------------   DATA SERVER START   -------------------------------------------------
 
-    gpiod_line* in1 = get_pin(chip_3, B+3, false, false);
-    gpiod_line* in2 = get_pin(chip_3, B+2, false, false);
-    gpiod_line* in3 = get_pin(chip_3, B+1, false, false);
-    gpiod_line* in4 = get_pin(chip_3, B+6, false, false);
+    // -------------------------------------------------   CAMERA TRACKING   --------------------------------------------------
 
-    gpiod_line* esl = get_pin(chip_3, A+7, true);
-    gpiod_line* esr = get_pin(chip_3, C+2, true);
-
-    // for (;;)
-    // {
-    //     std::cout << "Left: " << gpiod_line_get_value(esl) << ", Right: " << gpiod_line_get_value(esr) << std::endl;
-    //     usleep(100000);
-    // }
-
-    stepper::Base simple_stepper({in1, in2, in3, in4});
-    stepper::Horizontal stepper({in1, in2, in3, in4}, esl, esr);
-    stepper.set_speed(200);
-
-    stepper.calibrate();
-
-    // std::cout << "moving direction 1" << std::endl;
-    // std::cout << "speed 50" << std::endl;
-    // simple_stepper.set_speed(50);
-    // simple_stepper.move_steps(500);
-
-    // std::cout << "speed 100" << std::endl;
-    // simple_stepper.set_speed(100);
-    // simple_stepper.move_steps(700);
-
-    // std::cout << "speed 150" << std::endl;
-    // simple_stepper.set_speed(150);
-    // simple_stepper.move_steps(1000);
-
-    // std::cout << "speed 200" << std::endl;
-    // simple_stepper.set_speed(200);
-    // simple_stepper.move_steps(1000);
-
-    // std::cout << "speed 250" << std::endl;
-    // simple_stepper.set_speed(250);
-    // simple_stepper.move_steps(1000);
-
-    // usleep(1000000);
-
-    // std::cout << "moving direction 2" << std::endl;
-    // simple_stepper.move_steps(-4200);
-
-    // simple_stepper.off();
-
-    // cleanup
-    stepper.off();
-    usleep(100000);
-
-    gpiod_line_release(in1);
-    gpiod_line_release(in2);
-    gpiod_line_release(in3);
-    gpiod_line_release(in4);
-    gpiod_chip_close(chip_3);
+    // ------------------------------------------------   HARDWARE SHUTDOWN   -------------------------------------------------
+    all_off(horizontal_stepper, vstepper);
+    all_shut(horizontal_stepper, vstepper);
 
     return 0;
 }
